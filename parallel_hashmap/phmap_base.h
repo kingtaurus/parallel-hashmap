@@ -65,6 +65,27 @@ namespace phmap {
 namespace priv {
 
 // ----------------------------------------------------------------------------
+// If Pair is a standard-layout type, OffsetOf<Pair>::kFirst and
+// OffsetOf<Pair>::kSecond are equivalent to offsetof(Pair, first) and
+// offsetof(Pair, second) respectively. Otherwise they are -1.
+//
+// The purpose of OffsetOf is to avoid calling offsetof() on non-standard-layout
+// type, which is non-portable.
+// ----------------------------------------------------------------------------
+template <class Pair, class = std::true_type>
+struct OffsetOf {
+    static constexpr size_t kFirst = (size_t)-1;
+  static constexpr size_t kSecond = (size_t)-1;
+};
+
+template <class Pair>
+struct OffsetOf<Pair, typename std::is_standard_layout<Pair>::type> 
+{
+    static constexpr size_t kFirst = offsetof(Pair, first);
+    static constexpr size_t kSecond = offsetof(Pair, second);
+};
+
+// ----------------------------------------------------------------------------
 template <class K, class V>
 struct IsLayoutCompatible 
 {
