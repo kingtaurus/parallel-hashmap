@@ -23,6 +23,7 @@
 #include <fstream>
 #include <sstream>
 #include "phmap.h"
+
 namespace phmap
 {
 
@@ -34,10 +35,10 @@ namespace type_traits_internal {
     template<typename T> struct IsTriviallyCopyable : public std::is_trivially_copyable<T> {};
 #endif
 
-template <class T1, class T2>
-struct IsTriviallyCopyable<std::pair<T1, T2>> {
-    static constexpr bool value = IsTriviallyCopyable<T1>::value && IsTriviallyCopyable<T2>::value;
-};
+    template <class T1, class T2>
+    struct IsTriviallyCopyable<std::pair<T1, T2>> {
+        static constexpr bool value = IsTriviallyCopyable<T1>::value && IsTriviallyCopyable<T2>::value;
+    };
 }
 
 namespace priv {

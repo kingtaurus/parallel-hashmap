@@ -1600,7 +1600,7 @@ TEST(Table, NoThrowMoveAssign) {
       std::is_nothrow_move_assignable<std::equal_to<std::string_view>>::value);
   ASSERT_TRUE(std::is_nothrow_move_assignable<std::allocator<int>>::value);
   ASSERT_TRUE(
-      phmap::allocator_traits<std::allocator<int>>::is_always_equal::value);
+      std::allocator_traits<std::allocator<int>>::is_always_equal::value);
   EXPECT_TRUE(std::is_nothrow_move_assignable<StringTable>::value);
 }
 
@@ -1679,7 +1679,7 @@ template <template <typename> class C, class Table, class = void>
 struct VerifyResultOf : std::false_type {};
 
 template <template <typename> class C, class Table>
-struct VerifyResultOf<C, Table, phmap::void_t<C<Table>>> : std::true_type {};
+struct VerifyResultOf<C, Table, std::void_t<C<Table>>> : std::true_type {};
 
 #if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, HeterogeneousLookupOverloads) {

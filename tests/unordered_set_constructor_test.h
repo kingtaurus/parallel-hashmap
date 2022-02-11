@@ -106,8 +106,8 @@ using has_cxx14_std_apis = std::false_type;
 
 template <typename T>
 using expect_cxx14_apis =
-    phmap::disjunction<phmap::negation<is_std_unordered_set<T>>,
-                      has_cxx14_std_apis>;
+    std::disjunction<std::negation<is_std_unordered_set<T>>,
+                     has_cxx14_std_apis>;
 
 template <typename TypeParam>
 void BucketCountAllocTest(std::false_type) {}
@@ -156,8 +156,8 @@ using has_alloc_std_constructors = std::false_type;
 
 template <typename T>
 using expect_alloc_constructors =
-    phmap::disjunction<phmap::negation<is_std_unordered_set<T>>,
-                      has_alloc_std_constructors>;
+    std::disjunction<std::negation<is_std_unordered_set<T>>,
+                     has_alloc_std_constructors>;
 
 template <typename TypeParam>
 void AllocTest(std::false_type) {}

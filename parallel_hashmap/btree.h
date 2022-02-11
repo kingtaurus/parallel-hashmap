@@ -58,6 +58,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <compare>
+#include <optional>
 #include <limits>
 #include <new>
 
@@ -105,40 +107,108 @@ namespace phmap {
         template <class T>
         struct IsTriviallyMoveConstructibleObject
             : std::integral_constant<
-            bool, std::is_move_constructible<
-                      type_traits_internal::SingleMemberUnion<T>>::value &&
-            phmap::is_trivially_destructible<T>::value> {};
+            bool, std::is_move_constructible_v<type_traits_internal::SingleMemberUnion<T>> &&
+            std::is_trivially_destructible_v<T>> {};
 
         template <class T>
         struct IsTriviallyCopyConstructibleObject
             : std::integral_constant<
-            bool, std::is_copy_constructible<
-                      type_traits_internal::SingleMemberUnion<T>>::value &&
-            phmap::is_trivially_destructible<T>::value> {};
+            bool, std::is_copy_constructible_v<type_traits_internal::SingleMemberUnion<T>> &&
+            std::is_trivially_destructible_v<T>> {};
 
         template <class T>
         struct IsTriviallyMoveAssignableReference : std::false_type {};
 
         template <class T>
         struct IsTriviallyMoveAssignableReference<T&>
-            : phmap::is_trivially_move_assignable<T>::type {};
+            : std::is_trivially_move_assignable<T>::type {};
 
         template <class T>
         struct IsTriviallyMoveAssignableReference<T&&>
-            : phmap::is_trivially_move_assignable<T>::type {};
+            : std::is_trivially_move_assignable<T>::type {};
+
+
+        template <typename... Ts>
+        struct VoidTImpl {
+            using type = void;
+        };
+
+        // This trick to retrieve a default alignment is necessary for our
+        // implementation of aligned_storage_t to be consistent with any implementation
+        // of std::aligned_storage.
+        // ---------------------------------------------------------------------------
+        template <size_t Len, typename T = std::aligned_storage<Len>>
+            struct default_alignment_of_aligned_storage;
+
+        template <size_t Len, size_t Align>
+        struct default_alignment_of_aligned_storage<Len, std::aligned_storage<Len, Align>> {
+            static constexpr size_t value = Align;
+        };
+
+        // NOTE: The `is_detected` family of templates here differ from the library
+        // fundamentals specification in that for library fundamentals, `Op<Args...>` is
+        // evaluated as soon as the type `is_detected<Op, Args...>` undergoes
+        // substitution, regardless of whether or not the `::value` is accessed. That
+        // is inconsistent with all other standard traits and prevents lazy evaluation
+        // in larger contexts (such as if the `is_detected` check is a trailing argument
+        // of a `conjunction`. This implementation opts to instead be lazy in the same
+        // way that the standard traits are (this "defect" of the detection idiom
+        // specifications has been reported).
+        // ---------------------------------------------------------------------------
+
+        template <class Enabler, template <class...> class Op, class... Args>
+        struct is_detected_impl {
+            using type = std::false_type;
+        };
+
+        template <template <class...> class Op, class... Args>
+        struct is_detected_impl<typename VoidTImpl<Op<Args...>>::type, Op, Args...> {
+            using type = std::true_type;
+        };
+
+        template <template <class...> class Op, class... Args>
+        struct is_detected : is_detected_impl<void, Op, Args...>::type {};
+
+        template <class Enabler, class To, template <class...> class Op, class... Args>
+        struct is_detected_convertible_impl {
+            using type = std::false_type;
+        };
+
+        template <class To, template <class...> class Op, class... Args>
+        struct is_detected_convertible_impl<
+            typename std::enable_if_t<std::is_convertible_v<Op<Args...>, To>>,
+            To, Op, Args...> {
+            using type = std::true_type;
+        };
+
+        template <class To, template <class...> class Op, class... Args>
+        struct is_detected_convertible
+            : is_detected_convertible_impl<void, To, Op, Args...>::type {};
+
+        template <typename T>
+        using IsCopyAssignableImpl =
+            decltype(std::declval<T&>() = std::declval<const T&>());
+
+        template <typename T>
+        using IsMoveAssignableImpl = decltype(std::declval<T&>() = std::declval<T&&>());
 
     }  // namespace type_traits_internal
 
+    template <typename T>
+    struct is_copy_assignable : type_traits_internal::is_detected<
+        type_traits_internal::IsCopyAssignableImpl, T> {
+    };
 
-    template <typename... Ts>
-    using void_t = typename type_traits_internal::VoidTImpl<Ts...>::type;
-
+    template <typename T>
+    struct is_move_assignable : type_traits_internal::is_detected<
+        type_traits_internal::IsMoveAssignableImpl, T> {
+    };
 
     template <typename T>
     struct is_function
         : std::integral_constant<
-        bool, !(std::is_reference<T>::value ||
-                std::is_const<typename std::add_const<T>::type>::value)> {};
+        bool, !(std::is_reference_v<T> ||
+                std::is_const_v<typename std::add_const_t<T>>)> {};
 
 
     namespace type_traits_internal {
@@ -147,21 +217,21 @@ namespace phmap {
         class is_trivially_copyable_impl {
             using ExtentsRemoved = typename std::remove_all_extents<T>::type;
             static constexpr bool kIsCopyOrMoveConstructible =
-                std::is_copy_constructible<ExtentsRemoved>::value ||
-                std::is_move_constructible<ExtentsRemoved>::value;
+                std::is_copy_constructible_v<ExtentsRemoved> ||
+                std::is_move_constructible_v<ExtentsRemoved>;
             static constexpr bool kIsCopyOrMoveAssignable =
-                phmap::is_copy_assignable<ExtentsRemoved>::value ||
-                phmap::is_move_assignable<ExtentsRemoved>::value;
+                std::is_copy_assignable_v<ExtentsRemoved> ||
+                std::is_move_assignable_v<ExtentsRemoved>;
 
         public:
             static constexpr bool kValue =
                 (__has_trivial_copy(ExtentsRemoved) || !kIsCopyOrMoveConstructible) &&
                 (__has_trivial_assign(ExtentsRemoved) || !kIsCopyOrMoveAssignable) &&
                 (kIsCopyOrMoveConstructible || kIsCopyOrMoveAssignable) &&
-                is_trivially_destructible<ExtentsRemoved>::value &&
+                std::is_trivially_destructible_v<ExtentsRemoved> &&
                 // We need to check for this explicitly because otherwise we'll say
                 // references are trivial copyable when compiled by MSVC.
-                !std::is_reference<ExtentsRemoved>::value;
+                !std::is_reference_v<ExtentsRemoved>;
         };
 
         template <typename T>
@@ -186,7 +256,7 @@ namespace phmap {
         template <class T,
                   class IsNoexcept = std::integral_constant<
                       bool, noexcept(swap(std::declval<T&>(), std::declval<T&>()))>>
-            using IsNothrowSwappableImpl = typename std::enable_if<IsNoexcept::value>::type;
+            using IsNothrowSwappableImpl = typename std::enable_if_t<IsNoexcept::value>;
 
         template <class T>
         struct IsSwappable
@@ -196,12 +266,12 @@ namespace phmap {
         struct IsNothrowSwappable
             : phmap::type_traits_internal::is_detected<IsNothrowSwappableImpl, T> {};
 
-        template <class T, phmap::enable_if_t<IsSwappable<T>::value, int> = 0>
+        template <class T, std::enable_if_t<IsSwappable<T>::value, int> = 0>
         void Swap(T& lhs, T& rhs) noexcept(IsNothrowSwappable<T>::value) {
             swap(lhs, rhs);
         }
 
-       using StdSwapIsUnconstrained = IsSwappable<void()>;
+        using StdSwapIsUnconstrained = IsSwappable<void()>;
 
     }  // namespace swap_internal
 
@@ -215,6 +285,7 @@ namespace phmap {
 
     }  // namespace type_traits_internal
 
+#if 1
     namespace compare_internal {
 
         using value_type = int8_t;
@@ -230,9 +301,9 @@ namespace phmap {
 
             template <
                 typename T,
-                typename = typename std::enable_if<
-                    std::is_same<T, std::nullptr_t>::value ||
-                    (std::is_integral<T>::value && !std::is_same<T, int>::value)>::type,
+                typename = typename std::enable_if_t<
+                    std::is_same_v<T, std::nullptr_t> ||
+                    (std::is_integral_v<T> && !std::is_same_v<T, int>)>,
                 typename = typename Fail<T>::type>
                 OnlyLiteralZero(T);  // NOLINT
         };
@@ -311,418 +382,313 @@ namespace phmap {
             PHMAP_COMPARE_INLINE_BASECLASS_DECL(greater)
         };
 
-    }  // namespace compare_internal
+        class weak_equality : public compare_internal::weak_equality_base<weak_equality> 
+        {
+            explicit constexpr weak_equality(compare_internal::eq v) noexcept
+                : value_(static_cast<compare_internal::value_type>(v)) {}
+            friend struct compare_internal::weak_equality_base<weak_equality>;
 
-    class weak_equality
-        : public compare_internal::weak_equality_base<weak_equality> {
-        explicit constexpr weak_equality(compare_internal::eq v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        friend struct compare_internal::weak_equality_base<weak_equality>;
+        public:
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_equality, equivalent)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_equality, nonequivalent)
 
-    public:
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_equality, equivalent)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_equality, nonequivalent)
+            // Comparisons
+            friend constexpr bool operator==(
+                weak_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ == 0;
+            }
+            friend constexpr bool operator!=(
+                weak_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ != 0;
+            }
+            friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
+                                             weak_equality v) noexcept {
+                return 0 == v.value_;
+            }
+            friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
+                                             weak_equality v) noexcept {
+                return 0 != v.value_;
+            }
 
-        // Comparisons
-        friend constexpr bool operator==(
-            weak_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ == 0;
-        }
-        friend constexpr bool operator!=(
-            weak_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ != 0;
-        }
-        friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
-                                         weak_equality v) noexcept {
-            return 0 == v.value_;
-        }
-        friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
-                                         weak_equality v) noexcept {
-            return 0 != v.value_;
-        }
+        private:
+            compare_internal::value_type value_;
+        };
+        PHMAP_COMPARE_INLINE_INIT(weak_equality, equivalent,
+                                  compare_internal::eq::equivalent);
+        PHMAP_COMPARE_INLINE_INIT(weak_equality, nonequivalent,
+                                  compare_internal::eq::nonequivalent);
 
-    private:
-        compare_internal::value_type value_;
-    };
-    PHMAP_COMPARE_INLINE_INIT(weak_equality, equivalent,
-                              compare_internal::eq::equivalent);
-    PHMAP_COMPARE_INLINE_INIT(weak_equality, nonequivalent,
-                              compare_internal::eq::nonequivalent);
+        class strong_equality : public compare_internal::strong_equality_base<strong_equality> 
+        {
+            explicit constexpr strong_equality(compare_internal::eq v) noexcept
+                : value_(static_cast<compare_internal::value_type>(v)) {}
+            friend struct compare_internal::strong_equality_base<strong_equality>;
 
-    class strong_equality
-        : public compare_internal::strong_equality_base<strong_equality> {
-        explicit constexpr strong_equality(compare_internal::eq v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        friend struct compare_internal::strong_equality_base<strong_equality>;
+        public:
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, equal)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, nonequal)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, equivalent)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, nonequivalent)
 
-    public:
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, equal)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, nonequal)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, equivalent)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_equality, nonequivalent)
+            // Conversion
+            constexpr operator weak_equality() const noexcept {  // NOLINT
+                return value_ == 0 ? weak_equality::equivalent
+                    : weak_equality::nonequivalent;
+            }
+            // Comparisons
+            friend constexpr bool operator==(
+                strong_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ == 0;
+            }
+            friend constexpr bool operator!=(
+                strong_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ != 0;
+            }
+            friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
+                                             strong_equality v) noexcept {
+                return 0 == v.value_;
+            }
+            friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
+                                             strong_equality v) noexcept {
+                return 0 != v.value_;
+            }
 
-        // Conversion
-        constexpr operator weak_equality() const noexcept {  // NOLINT
-            return value_ == 0 ? weak_equality::equivalent
-                : weak_equality::nonequivalent;
-        }
-        // Comparisons
-        friend constexpr bool operator==(
-            strong_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ == 0;
-        }
-        friend constexpr bool operator!=(
-            strong_equality v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ != 0;
-        }
-        friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
-                                         strong_equality v) noexcept {
-            return 0 == v.value_;
-        }
-        friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
-                                         strong_equality v) noexcept {
-            return 0 != v.value_;
-        }
+        private:
+            compare_internal::value_type value_;
+        };
 
-    private:
-        compare_internal::value_type value_;
-    };
+        PHMAP_COMPARE_INLINE_INIT(strong_equality, equal, compare_internal::eq::equal);
+        PHMAP_COMPARE_INLINE_INIT(strong_equality, nonequal,
+                                  compare_internal::eq::nonequal);
+        PHMAP_COMPARE_INLINE_INIT(strong_equality, equivalent,
+                                  compare_internal::eq::equivalent);
+        PHMAP_COMPARE_INLINE_INIT(strong_equality, nonequivalent,
+                                  compare_internal::eq::nonequivalent);
 
-    PHMAP_COMPARE_INLINE_INIT(strong_equality, equal, compare_internal::eq::equal);
-    PHMAP_COMPARE_INLINE_INIT(strong_equality, nonequal,
-                              compare_internal::eq::nonequal);
-    PHMAP_COMPARE_INLINE_INIT(strong_equality, equivalent,
-                              compare_internal::eq::equivalent);
-    PHMAP_COMPARE_INLINE_INIT(strong_equality, nonequivalent,
-                              compare_internal::eq::nonequivalent);
+        class partial_ordering : public compare_internal::partial_ordering_base<partial_ordering> 
+        {
+            explicit constexpr partial_ordering(compare_internal::eq v) noexcept
+                : value_(static_cast<compare_internal::value_type>(v)) {}
+            explicit constexpr partial_ordering(compare_internal::ord v) noexcept
+                : value_(static_cast<compare_internal::value_type>(v)) {}
+            explicit constexpr partial_ordering(compare_internal::ncmp v) noexcept
+                : value_(static_cast<compare_internal::value_type>(v)) {}
+            friend struct compare_internal::partial_ordering_base<partial_ordering>;
 
-    class partial_ordering
-        : public compare_internal::partial_ordering_base<partial_ordering> {
-        explicit constexpr partial_ordering(compare_internal::eq v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        explicit constexpr partial_ordering(compare_internal::ord v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        explicit constexpr partial_ordering(compare_internal::ncmp v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        friend struct compare_internal::partial_ordering_base<partial_ordering>;
+            constexpr bool is_ordered() const noexcept {
+                return value_ !=
+                    compare_internal::value_type(compare_internal::ncmp::unordered);
+            }
 
-        constexpr bool is_ordered() const noexcept {
-            return value_ !=
-                compare_internal::value_type(compare_internal::ncmp::unordered);
-        }
+        public:
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, less)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, equivalent)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, greater)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, unordered)
 
-    public:
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, less)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, equivalent)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, greater)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(partial_ordering, unordered)
+            // Conversion
+            constexpr operator weak_equality() const noexcept {  // NOLINT
+                return value_ == 0 ? weak_equality::equivalent
+                    : weak_equality::nonequivalent;
+            }
+            // Comparisons
+            friend constexpr bool operator==(
+                partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.is_ordered() && v.value_ == 0;
+            }
+            friend constexpr bool operator!=(
+                partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return !v.is_ordered() || v.value_ != 0;
+            }
+            friend constexpr bool operator<(
+                partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.is_ordered() && v.value_ < 0;
+            }
+            friend constexpr bool operator<=(
+                partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.is_ordered() && v.value_ <= 0;
+            }
+            friend constexpr bool operator>(
+                partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.is_ordered() && v.value_ > 0;
+            }
+            friend constexpr bool operator>=(
+                partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.is_ordered() && v.value_ >= 0;
+            }
+            friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
+                                             partial_ordering v) noexcept {
+                return v.is_ordered() && 0 == v.value_;
+            }
+            friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
+                                             partial_ordering v) noexcept {
+                return !v.is_ordered() || 0 != v.value_;
+            }
+            friend constexpr bool operator<(compare_internal::OnlyLiteralZero<>,
+                                            partial_ordering v) noexcept {
+                return v.is_ordered() && 0 < v.value_;
+            }
+            friend constexpr bool operator<=(compare_internal::OnlyLiteralZero<>,
+                                             partial_ordering v) noexcept {
+                return v.is_ordered() && 0 <= v.value_;
+            }
+            friend constexpr bool operator>(compare_internal::OnlyLiteralZero<>,
+                                            partial_ordering v) noexcept {
+                return v.is_ordered() && 0 > v.value_;
+            }
+            friend constexpr bool operator>=(compare_internal::OnlyLiteralZero<>,
+                                             partial_ordering v) noexcept {
+                return v.is_ordered() && 0 >= v.value_;
+            }
 
-        // Conversion
-        constexpr operator weak_equality() const noexcept {  // NOLINT
-            return value_ == 0 ? weak_equality::equivalent
-                : weak_equality::nonequivalent;
-        }
-        // Comparisons
-        friend constexpr bool operator==(
-            partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.is_ordered() && v.value_ == 0;
-        }
-        friend constexpr bool operator!=(
-            partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return !v.is_ordered() || v.value_ != 0;
-        }
-        friend constexpr bool operator<(
-            partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.is_ordered() && v.value_ < 0;
-        }
-        friend constexpr bool operator<=(
-            partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.is_ordered() && v.value_ <= 0;
-        }
-        friend constexpr bool operator>(
-            partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.is_ordered() && v.value_ > 0;
-        }
-        friend constexpr bool operator>=(
-            partial_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.is_ordered() && v.value_ >= 0;
-        }
-        friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
-                                         partial_ordering v) noexcept {
-            return v.is_ordered() && 0 == v.value_;
-        }
-        friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
-                                         partial_ordering v) noexcept {
-            return !v.is_ordered() || 0 != v.value_;
-        }
-        friend constexpr bool operator<(compare_internal::OnlyLiteralZero<>,
-                                        partial_ordering v) noexcept {
-            return v.is_ordered() && 0 < v.value_;
-        }
-        friend constexpr bool operator<=(compare_internal::OnlyLiteralZero<>,
-                                         partial_ordering v) noexcept {
-            return v.is_ordered() && 0 <= v.value_;
-        }
-        friend constexpr bool operator>(compare_internal::OnlyLiteralZero<>,
-                                        partial_ordering v) noexcept {
-            return v.is_ordered() && 0 > v.value_;
-        }
-        friend constexpr bool operator>=(compare_internal::OnlyLiteralZero<>,
-                                         partial_ordering v) noexcept {
-            return v.is_ordered() && 0 >= v.value_;
-        }
+        private:
+            compare_internal::value_type value_;
+        };
 
-    private:
-        compare_internal::value_type value_;
-    };
+        PHMAP_COMPARE_INLINE_INIT(partial_ordering, less, compare_internal::ord::less);
+        PHMAP_COMPARE_INLINE_INIT(partial_ordering, equivalent,
+                                  compare_internal::eq::equivalent);
+        PHMAP_COMPARE_INLINE_INIT(partial_ordering, greater,
+                                  compare_internal::ord::greater);
+        PHMAP_COMPARE_INLINE_INIT(partial_ordering, unordered,
+                                  compare_internal::ncmp::unordered);
 
-    PHMAP_COMPARE_INLINE_INIT(partial_ordering, less, compare_internal::ord::less);
-    PHMAP_COMPARE_INLINE_INIT(partial_ordering, equivalent,
-                              compare_internal::eq::equivalent);
-    PHMAP_COMPARE_INLINE_INIT(partial_ordering, greater,
-                              compare_internal::ord::greater);
-    PHMAP_COMPARE_INLINE_INIT(partial_ordering, unordered,
-                              compare_internal::ncmp::unordered);
+        class weak_ordering : public compare_internal::weak_ordering_base<weak_ordering>
+        {
+            explicit constexpr weak_ordering(compare_internal::eq v) noexcept
+                : value_(static_cast<compare_internal::value_type>(v)) {}
+            explicit constexpr weak_ordering(compare_internal::ord v) noexcept
+                : value_(static_cast<compare_internal::value_type>(v)) {}
+            friend struct compare_internal::weak_ordering_base<weak_ordering>;
 
-    class weak_ordering
-        : public compare_internal::weak_ordering_base<weak_ordering> {
-        explicit constexpr weak_ordering(compare_internal::eq v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        explicit constexpr weak_ordering(compare_internal::ord v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        friend struct compare_internal::weak_ordering_base<weak_ordering>;
+        public:
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_ordering, less)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_ordering, equivalent)
+            PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_ordering, greater)
 
-    public:
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_ordering, less)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_ordering, equivalent)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(weak_ordering, greater)
+            // Conversions
+            constexpr operator weak_equality() const noexcept {  // NOLINT
+                return value_ == 0 ? weak_equality::equivalent
+                    : weak_equality::nonequivalent;
+            }
+            constexpr operator partial_ordering() const noexcept {  // NOLINT
+                return value_ == 0 ? partial_ordering::equivalent
+                    : (value_ < 0 ? partial_ordering::less
+                       : partial_ordering::greater);
+            }
+            // Comparisons
+            friend constexpr bool operator==(
+                weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ == 0;
+            }
+            friend constexpr bool operator!=(
+                weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ != 0;
+            }
+            friend constexpr bool operator<(
+                weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ < 0;
+            }
+            friend constexpr bool operator<=(
+                weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ <= 0;
+            }
+            friend constexpr bool operator>(
+                weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ > 0;
+            }
+            friend constexpr bool operator>=(
+                weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
+                return v.value_ >= 0;
+            }
+            friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
+                                             weak_ordering v) noexcept {
+                return 0 == v.value_;
+            }
+            friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
+                                             weak_ordering v) noexcept {
+                return 0 != v.value_;
+            }
+            friend constexpr bool operator<(compare_internal::OnlyLiteralZero<>,
+                                            weak_ordering v) noexcept {
+                return 0 < v.value_;
+            }
+            friend constexpr bool operator<=(compare_internal::OnlyLiteralZero<>,
+                                             weak_ordering v) noexcept {
+                return 0 <= v.value_;
+            }
+            friend constexpr bool operator>(compare_internal::OnlyLiteralZero<>,
+                                            weak_ordering v) noexcept {
+                return 0 > v.value_;
+            }
+            friend constexpr bool operator>=(compare_internal::OnlyLiteralZero<>,
+                                             weak_ordering v) noexcept {
+                return 0 >= v.value_;
+            }
 
-        // Conversions
-        constexpr operator weak_equality() const noexcept {  // NOLINT
-            return value_ == 0 ? weak_equality::equivalent
-                : weak_equality::nonequivalent;
-        }
-        constexpr operator partial_ordering() const noexcept {  // NOLINT
-            return value_ == 0 ? partial_ordering::equivalent
-                : (value_ < 0 ? partial_ordering::less
-                   : partial_ordering::greater);
-        }
-        // Comparisons
-        friend constexpr bool operator==(
-            weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ == 0;
-        }
-        friend constexpr bool operator!=(
-            weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ != 0;
-        }
-        friend constexpr bool operator<(
-            weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ < 0;
-        }
-        friend constexpr bool operator<=(
-            weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ <= 0;
-        }
-        friend constexpr bool operator>(
-            weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ > 0;
-        }
-        friend constexpr bool operator>=(
-            weak_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ >= 0;
-        }
-        friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
-                                         weak_ordering v) noexcept {
-            return 0 == v.value_;
-        }
-        friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
-                                         weak_ordering v) noexcept {
-            return 0 != v.value_;
-        }
-        friend constexpr bool operator<(compare_internal::OnlyLiteralZero<>,
-                                        weak_ordering v) noexcept {
-            return 0 < v.value_;
-        }
-        friend constexpr bool operator<=(compare_internal::OnlyLiteralZero<>,
-                                         weak_ordering v) noexcept {
-            return 0 <= v.value_;
-        }
-        friend constexpr bool operator>(compare_internal::OnlyLiteralZero<>,
-                                        weak_ordering v) noexcept {
-            return 0 > v.value_;
-        }
-        friend constexpr bool operator>=(compare_internal::OnlyLiteralZero<>,
-                                         weak_ordering v) noexcept {
-            return 0 >= v.value_;
-        }
+        private:
+            compare_internal::value_type value_;
+        };
 
-    private:
-        compare_internal::value_type value_;
-    };
+        PHMAP_COMPARE_INLINE_INIT(weak_ordering, less, compare_internal::ord::less);
+        PHMAP_COMPARE_INLINE_INIT(weak_ordering, equivalent,
+                                  compare_internal::eq::equivalent);
+        PHMAP_COMPARE_INLINE_INIT(weak_ordering, greater,
+                                  compare_internal::ord::greater);
 
-    PHMAP_COMPARE_INLINE_INIT(weak_ordering, less, compare_internal::ord::less);
-    PHMAP_COMPARE_INLINE_INIT(weak_ordering, equivalent,
-                              compare_internal::eq::equivalent);
-    PHMAP_COMPARE_INLINE_INIT(weak_ordering, greater,
-                              compare_internal::ord::greater);
-
-    class strong_ordering
-        : public compare_internal::strong_ordering_base<strong_ordering> {
-        explicit constexpr strong_ordering(compare_internal::eq v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        explicit constexpr strong_ordering(compare_internal::ord v) noexcept
-            : value_(static_cast<compare_internal::value_type>(v)) {}
-        friend struct compare_internal::strong_ordering_base<strong_ordering>;
-
-    public:
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_ordering, less)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_ordering, equal)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_ordering, equivalent)
-        PHMAP_COMPARE_INLINE_SUBCLASS_DECL(strong_ordering, greater)
-
-        // Conversions
-        constexpr operator weak_equality() const noexcept {  // NOLINT
-            return value_ == 0 ? weak_equality::equivalent
-                : weak_equality::nonequivalent;
-        }
-        constexpr operator strong_equality() const noexcept {  // NOLINT
-            return value_ == 0 ? strong_equality::equal : strong_equality::nonequal;
-        }
-        constexpr operator partial_ordering() const noexcept {  // NOLINT
-            return value_ == 0 ? partial_ordering::equivalent
-                : (value_ < 0 ? partial_ordering::less
-                   : partial_ordering::greater);
-        }
-        constexpr operator weak_ordering() const noexcept {  // NOLINT
-            return value_ == 0
-                ? weak_ordering::equivalent
-                : (value_ < 0 ? weak_ordering::less : weak_ordering::greater);
-        }
-        // Comparisons
-        friend constexpr bool operator==(
-            strong_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ == 0;
-        }
-        friend constexpr bool operator!=(
-            strong_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ != 0;
-        }
-        friend constexpr bool operator<(
-            strong_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ < 0;
-        }
-        friend constexpr bool operator<=(
-            strong_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ <= 0;
-        }
-        friend constexpr bool operator>(
-            strong_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ > 0;
-        }
-        friend constexpr bool operator>=(
-            strong_ordering v, compare_internal::OnlyLiteralZero<>) noexcept {
-            return v.value_ >= 0;
-        }
-        friend constexpr bool operator==(compare_internal::OnlyLiteralZero<>,
-                                         strong_ordering v) noexcept {
-            return 0 == v.value_;
-        }
-        friend constexpr bool operator!=(compare_internal::OnlyLiteralZero<>,
-                                         strong_ordering v) noexcept {
-            return 0 != v.value_;
-        }
-        friend constexpr bool operator<(compare_internal::OnlyLiteralZero<>,
-                                        strong_ordering v) noexcept {
-            return 0 < v.value_;
-        }
-        friend constexpr bool operator<=(compare_internal::OnlyLiteralZero<>,
-                                         strong_ordering v) noexcept {
-            return 0 <= v.value_;
-        }
-        friend constexpr bool operator>(compare_internal::OnlyLiteralZero<>,
-                                        strong_ordering v) noexcept {
-            return 0 > v.value_;
-        }
-        friend constexpr bool operator>=(compare_internal::OnlyLiteralZero<>,
-                                         strong_ordering v) noexcept {
-            return 0 >= v.value_;
-        }
-
-    private:
-        compare_internal::value_type value_;
-    };
-    PHMAP_COMPARE_INLINE_INIT(strong_ordering, less, compare_internal::ord::less);
-    PHMAP_COMPARE_INLINE_INIT(strong_ordering, equal, compare_internal::eq::equal);
-    PHMAP_COMPARE_INLINE_INIT(strong_ordering, equivalent,
-                              compare_internal::eq::equivalent);
-    PHMAP_COMPARE_INLINE_INIT(strong_ordering, greater,
-                              compare_internal::ord::greater);
 
 #undef PHMAP_COMPARE_INLINE_BASECLASS_DECL
 #undef PHMAP_COMPARE_INLINE_SUBCLASS_DECL
 #undef PHMAP_COMPARE_INLINE_INIT
 
-    namespace compare_internal {
         // We also provide these comparator adapter functions for internal phmap use.
 
         // Helper functions to do a boolean comparison of two keys given a boolean
         // or three-way comparator.
         // SFINAE prevents implicit conversions to bool (such as from int).
-        template <typename BoolType,
-                  phmap::enable_if_t<std::is_same<bool, BoolType>::value, int> = 0>
+        template <typename BoolType, std::enable_if_t<std::is_same_v<bool, BoolType>, int> = 0>
         constexpr bool compare_result_as_less_than(const BoolType r) { return r; }
-        constexpr bool compare_result_as_less_than(const phmap::weak_ordering r) {
+
+        constexpr bool compare_result_as_less_than(const std::weak_ordering r) {
             return r < 0;
         }
 
         template <typename Compare, typename K, typename LK>
-        constexpr bool do_less_than_comparison(const Compare &compare, const K &x,
-                                               const LK &y) {
+        constexpr bool do_less_than_comparison(const Compare &compare, const K &x, const LK &y) {
             return compare_result_as_less_than(compare(x, y));
         }
 
         // Helper functions to do a three-way comparison of two keys given a boolean or
         // three-way comparator.
         // SFINAE prevents implicit conversions to int (such as from bool).
-        template <typename Int,
-                  phmap::enable_if_t<std::is_same<int, Int>::value, int> = 0>
-        constexpr phmap::weak_ordering compare_result_as_ordering(const Int c) {
-            return c < 0 ? phmap::weak_ordering::less
-                       : c == 0 ? phmap::weak_ordering::equivalent
-                       : phmap::weak_ordering::greater;
+        template <typename Int, std::enable_if_t<std::is_same_v<int, Int>, int> = 0>
+        constexpr std::weak_ordering compare_result_as_ordering(const Int c) {
+            return c < 0 ? std::weak_ordering::less
+                       : c == 0 ? std::weak_ordering::equivalent
+                       : std::weak_ordering::greater;
         }
-        constexpr phmap::weak_ordering compare_result_as_ordering(
-            const phmap::weak_ordering c) {
+
+        constexpr std::weak_ordering compare_result_as_ordering(const std::weak_ordering c) {
             return c;
         }
 
-        template <
-            typename Compare, typename K, typename LK,
-            phmap::enable_if_t<!std::is_same<bool, phmap::invoke_result_t<
-                                                       Compare, const K &, const LK &>>::value,
-                               int> = 0>
-            constexpr phmap::weak_ordering do_three_way_comparison(const Compare &compare,
-                                                                   const K &x, const LK &y) {
+        template <typename Compare, typename K, typename LK,
+                  std::enable_if_t<!std::is_same_v<bool, std::invoke_result_t<Compare, const K &, const LK &>>, int> = 0>
+            constexpr std::weak_ordering do_three_way_comparison(const Compare &compare, const K &x, const LK &y) {
             return compare_result_as_ordering(compare(x, y));
         }
-        template <
-            typename Compare, typename K, typename LK,
-            phmap::enable_if_t<std::is_same<bool, phmap::invoke_result_t<Compare,
-            const K &, const LK &>>::value,
-                               int> = 0>
-            constexpr phmap::weak_ordering do_three_way_comparison(const Compare &compare,
-                                                                   const K &x, const LK &y) {
-            return compare(x, y) ? phmap::weak_ordering::less
-                : compare(y, x) ? phmap::weak_ordering::greater
-                : phmap::weak_ordering::equivalent;
+
+        template <typename Compare, typename K, typename LK,
+                  std::enable_if_t<std::is_same_v<bool, std::invoke_result_t<Compare, const K &, const LK &>>, int> = 0>
+            constexpr std::weak_ordering do_three_way_comparison(const Compare &cmp, const K &x, const LK &y) {
+            return cmp(x, y) ? std::weak_ordering::less
+                : cmp(y, x) ? std::weak_ordering::greater
+                : std::weak_ordering::equivalent;
         }
-
+        
     }  // namespace compare_internal
-}
+#endif
 
-
-namespace phmap {
 
 namespace priv {
 
@@ -730,8 +696,8 @@ namespace priv {
     // comparator.
     template <typename Compare, typename T>
     using btree_is_key_compare_to =
-        std::is_convertible<phmap::invoke_result_t<Compare, const T &, const T &>,
-                            phmap::weak_ordering>;
+        std::is_convertible<std::invoke_result_t<Compare, const T &, const T &>,
+                            std::weak_ordering>;
 
     struct StringBtreeDefaultLess {
         using is_transparent = void;
@@ -744,13 +710,13 @@ namespace priv {
         StringBtreeDefaultLess(std::less<std::string_view>) {}  // NOLINT
         StringBtreeDefaultLess(phmap::Less<std::string_view>) {}  // NOLINT
 
-        phmap::weak_ordering operator()(std::string_view lhs,
-                                        std::string_view rhs) const {
+        std::weak_ordering operator()(std::string_view lhs,
+                                      std::string_view rhs) const {
             return compare_internal::compare_result_as_ordering(lhs.compare(rhs));
         }
 #else
-        phmap::weak_ordering operator()(std::string lhs,
-                                        std::string rhs) const {
+        std::weak_ordering operator()(std::string lhs,
+                                      std::string rhs) const {
             return compare_internal::compare_result_as_ordering(lhs.compare(rhs));
         }
 #endif
@@ -765,12 +731,12 @@ namespace priv {
 #if PHMAP_HAVE_STD_STRING_VIEW
         StringBtreeDefaultGreater(std::greater<std::string_view>) {}  // NOLINT
 
-        phmap::weak_ordering operator()(std::string_view lhs,
+        std::weak_ordering operator()(std::string_view lhs,
                                         std::string_view rhs) const {
             return compare_internal::compare_result_as_ordering(rhs.compare(lhs));
         }
 #else
-        phmap::weak_ordering operator()(std::string lhs,
+        std::weak_ordering operator()(std::string lhs,
                                         std::string rhs) const {
             return compare_internal::compare_result_as_ordering(rhs.compare(lhs));
         }
@@ -865,8 +831,8 @@ namespace priv {
         // This is an integral type large enough to hold as many
         // ValueSize-values as will fit a node of TargetNodeSize bytes.
         using node_count_type =
-            phmap::conditional_t<(kNodeValueSpace / sizeof(value_type) >
-                                   (std::numeric_limits<uint8_t>::max)()),
+            std::conditional_t<(kNodeValueSpace / sizeof(value_type) >
+                                (std::numeric_limits<uint8_t>::max)()),
             uint16_t, uint8_t>;  // NOLINT
 
         // The following methods are necessary for passing this struct as PolicyTraits
@@ -951,18 +917,18 @@ namespace priv {
 
         template <typename Alloc, class... Args>
         static void construct(Alloc *alloc, slot_type *slot, Args &&... args) {
-            phmap::allocator_traits<Alloc>::construct(*alloc, slot,
-                                                       std::forward<Args>(args)...);
+            std::allocator_traits<Alloc>::construct(*alloc, slot,
+                                                    std::forward<Args>(args)...);
         }
 
         template <typename Alloc>
         static void construct(Alloc *alloc, slot_type *slot, slot_type *other) {
-            phmap::allocator_traits<Alloc>::construct(*alloc, slot, std::move(*other));
+            std::allocator_traits<Alloc>::construct(*alloc, slot, std::move(*other));
         }
 
         template <typename Alloc>
         static void destroy(Alloc *alloc, slot_type *slot) {
-            phmap::allocator_traits<Alloc>::destroy(*alloc, slot);
+            std::allocator_traits<Alloc>::destroy(*alloc, slot);
         }
 
         template <typename Alloc>
@@ -1068,10 +1034,10 @@ namespace priv {
         // TODO(ezb): Might make sense to add condition(s) based on node-size.
         using use_linear_search = std::integral_constant<
             bool,
-            std::is_arithmetic<key_type>::value &&
-            (std::is_same<phmap::Less<key_type>, key_compare>::value ||
-             std::is_same<std::less<key_type>, key_compare>::value ||
-             std::is_same<std::greater<key_type>, key_compare>::value)>;
+            std::is_arithmetic_v<key_type> &&
+            (std::is_same_v<phmap::Less<key_type>, key_compare> ||
+             std::is_same_v<std::less<key_type>, key_compare> ||
+             std::is_same_v<std::greater<key_type>, key_compare>)>;
 
 
         ~btree_node() = default;
@@ -1090,12 +1056,12 @@ namespace priv {
 
     private:
         using layout_type = phmap::priv::Layout<btree_node *, field_type,
-                                                               slot_type, btree_node *>;
+                                                slot_type, btree_node *>;
         constexpr static size_type SizeWithNValues(size_type n) {
             return (size_type)layout_type(/*parent*/ 1,
-                               /*position, start, count, max_count*/ 4,
-                               /*values*/ (size_t)n,
-                               /*children*/ 0)
+                                          /*position, start, count, max_count*/ 4,
+                                          /*values*/ (size_t)n,
+                                          /*children*/ 0)
                 .AllocSize();
         }
         // A lower bound for the overhead of fields other than values in a leaf node.
@@ -1214,10 +1180,10 @@ namespace priv {
         btree_node *child(size_type i) const { return GetField<3>()[i]; }
         btree_node *&mutable_child(size_type i) { return GetField<3>()[i]; }
         void clear_child(size_type i) {
-            phmap::priv::SanitizerPoisonObject(&mutable_child(i));
+            SanitizerPoisonObject(&mutable_child(i));
         }
         void set_child(size_type i, btree_node *c) {
-            phmap::priv::SanitizerUnpoisonObject(&mutable_child(i));
+            SanitizerUnpoisonObject(&mutable_child(i));
             mutable_child(i) = c;
             c->set_position((field_type)i);
         }
@@ -1277,7 +1243,7 @@ namespace priv {
             const K &k, int s, const int e, const Compare &comp,
             std::true_type /* IsCompareTo */) const {
             while (s < e) {
-                const phmap::weak_ordering c = comp(key(s), k);
+                const std::weak_ordering c = comp(key(s), k);
                 if (c == 0) {
                     return {s, MatchKind::kEq};
                 } else if (c > 0) {
@@ -1315,7 +1281,7 @@ namespace priv {
                 MatchKind exact_match = MatchKind::kNe;
                 while (s != e) {
                     const int mid = (s + e) >> 1;
-                    const phmap::weak_ordering c = comp(key(mid), k);
+                    const std::weak_ordering c = comp(key(mid), k);
                     if (c < 0) {
                         s = mid + 1;
                     } else {
@@ -1332,7 +1298,7 @@ namespace priv {
             } else {  // Not a multi-container.
                 while (s != e) {
                     const int mid = (s + e) >> 1;
-                    const phmap::weak_ordering c = comp(key(mid), k);
+                    const std::weak_ordering c = comp(key(mid), k);
                     if (c < 0) {
                         s = mid + 1;
                     } else if (c > 0) {
@@ -1383,7 +1349,7 @@ namespace priv {
             n->set_start(0);
             n->set_count(0);
             n->set_max_count((field_type)max_cnt);
-            phmap::priv::SanitizerPoisonMemoryRegion(
+            SanitizerPoisonMemoryRegion(
                 n->slot(0), max_cnt * sizeof(slot_type));
             return n;
         }
@@ -1392,7 +1358,7 @@ namespace priv {
             // Set `max_count` to a sentinel value to indicate that this node is
             // internal.
             n->set_max_count(kInternalNodeMaxCount);
-            phmap::priv::SanitizerPoisonMemoryRegion(
+            SanitizerPoisonMemoryRegion(
                 &n->mutable_child(0), (kNodeValues + 1) * sizeof(btree_node *));
             return n;
         }
@@ -1411,12 +1377,12 @@ namespace priv {
     private:
         template <typename... Args>
         void value_init(const size_type i, allocator_type *alloc, Args &&... args) {
-            phmap::priv::SanitizerUnpoisonObject(slot(i));
+            SanitizerUnpoisonObject(slot(i));
             params_type::construct(alloc, slot(i), std::forward<Args>(args)...);
         }
         void value_destroy(const size_type i, allocator_type *alloc) {
             params_type::destroy(alloc, slot(i));
-            phmap::priv::SanitizerPoisonObject(slot(i));
+            SanitizerPoisonObject(slot(i));
         }
 
         // Move n values starting at value i in this node into the values starting at
@@ -1424,7 +1390,7 @@ namespace priv {
         void uninitialized_move_n(const size_type n, const size_type i,
                                   const size_type j, btree_node *x,
                                   allocator_type *alloc) {
-            phmap::priv::SanitizerUnpoisonMemoryRegion(
+            SanitizerUnpoisonMemoryRegion(
                 x->slot(j), n * sizeof(slot_type));
             for (slot_type *src = slot(i), *end = src + n, *dest = x->slot(j);
                  src != end; ++src, ++dest) {
@@ -1484,9 +1450,9 @@ namespace priv {
         // that btree_iterator can be trivially copyable. This is for performance and
         // binary size reasons.
         template <typename N, typename R, typename P,
-                  phmap::enable_if_t<
-                      std::is_same<btree_iterator<N, R, P>, iterator>::value &&
-                      std::is_same<btree_iterator, const_iterator>::value,
+                  std::enable_if_t<
+                      std::is_same_v<btree_iterator<N, R, P>, iterator> &&
+                      std::is_same_v<btree_iterator, const_iterator>,
                       int> = 0>
             btree_iterator(const btree_iterator<N, R, P> &x)  // NOLINT
             : node(x.node), position(x.position) {}
@@ -1497,9 +1463,9 @@ namespace priv {
         // NOTE: the const_cast is safe because this constructor is only called by
         // non-const methods and the container owns the nodes.
         template <typename N, typename R, typename P,
-                  phmap::enable_if_t<
-                      std::is_same<btree_iterator<N, R, P>, const_iterator>::value &&
-                      std::is_same<btree_iterator, iterator>::value,
+                  std::enable_if_t<
+                      std::is_same_v<btree_iterator<N, R, P>, const_iterator> &&
+                      std::is_same_v<btree_iterator, iterator>,
                       int> = 0>
             explicit btree_iterator(const btree_iterator<N, R, P> &x)
             : node(const_cast<node_type *>(x.node)), position(x.position) {}
@@ -1686,8 +1652,8 @@ namespace priv {
         btree(const btree &x);
         btree(btree &&x) noexcept
             : root_(std::move(x.root_)),
-            rightmost_(phmap::exchange(x.rightmost_, EmptyNode())),
-            size_(phmap::exchange(x.size_, 0)) {
+            rightmost_(std::exchange(x.rightmost_, EmptyNode())),
+            size_(std::exchange(x.size_, 0)) {
             x.mutable_root() = EmptyNode();
         }
 
@@ -1969,7 +1935,7 @@ namespace priv {
         // allocator.
         node_type *allocate(const size_type sz) {
             return reinterpret_cast<node_type *>(
-                phmap::priv::Allocate<node_type::Alignment()>(
+                Allocate<node_type::Alignment()>(
                     mutable_allocator(), (size_t)sz));
         }
 
@@ -1994,7 +1960,7 @@ namespace priv {
 
         // Deallocates a node of a certain size in bytes using the allocator.
         void deallocate(const size_type sz, node_type *node) {
-            phmap::priv::Deallocate<node_type::Alignment()>(
+            Deallocate<node_type::Alignment()>(
                 mutable_allocator(), node, (size_t)sz);
         }
 
@@ -2106,8 +2072,7 @@ namespace priv {
     private:
         // We use compressed tuple in order to save space because key_compare and
         // allocator_type are usually empty.
-        phmap::priv::CompressedTuple<key_compare, allocator_type,
-                                                    node_type *>
+        phmap::priv::CompressedTuple<key_compare, allocator_type, node_type *>
         root_;
 
         // A pointer to the rightmost node. Note that the leftmost node is stored as
@@ -2459,8 +2424,8 @@ namespace priv {
     template <typename P>
     template <typename Btree>
     void btree<P>::copy_or_move_values_in_order(Btree *x) {
-        static_assert(std::is_same<btree, Btree>::value ||
-                      std::is_same<const btree, Btree>::value,
+        static_assert(std::is_same_v<btree, Btree> ||
+                      std::is_same_v<const btree, Btree>,
                       "Btree type must be same or const.");
         assert(empty());
 
@@ -2479,9 +2444,9 @@ namespace priv {
 
     template <typename P>
     constexpr bool btree<P>::static_assert_validation() {
-        static_assert(std::is_nothrow_copy_constructible<key_compare>::value,
+        static_assert(std::is_nothrow_copy_constructible_v<key_compare>,
                       "Key comparison must be nothrow copy constructible");
-        static_assert(std::is_nothrow_copy_constructible<allocator_type>::value,
+        static_assert(std::is_nothrow_copy_constructible_v<allocator_type>,
                       "Allocator must be nothrow copy constructible");
         static_assert(type_traits_internal::is_trivially_copyable<iterator>::value,
                       "iterator not trivially copyable.");
@@ -2492,13 +2457,13 @@ namespace priv {
             kNodeValues < (1 << (8 * sizeof(typename node_type::field_type))),
             "target node size too large");
 
-        // Verify that key_compare returns an phmap::{weak,strong}_ordering or bool.
+        // Verify that key_compare returns an std::{weak,strong}_ordering or bool.
         using compare_result_type =
-            phmap::invoke_result_t<key_compare, key_type, key_type>;
+            std::invoke_result_t<key_compare, key_type, key_type>;
         static_assert(
-            std::is_same<compare_result_type, bool>::value ||
-            std::is_convertible<compare_result_type, phmap::weak_ordering>::value,
-            "key comparison function must return phmap::{weak,strong}_ordering or "
+            std::is_same_v<compare_result_type, bool> ||
+            std::is_convertible_v<compare_result_type, std::weak_ordering>,
+            "key comparison function must return std::{weak,strong}_ordering or "
             "bool.");
 
         // Test the assumption made in setting kNodeValueSpace.
@@ -2628,7 +2593,7 @@ namespace priv {
             clear();
 
             *mutable_key_comp() = x.key_comp();
-            if (phmap::allocator_traits<
+            if (std::allocator_traits<
                 allocator_type>::propagate_on_container_copy_assignment::value) {
                 *mutable_allocator() = x.allocator();
             }
@@ -2644,7 +2609,7 @@ namespace priv {
             clear();
 
             using std::swap;
-            if (phmap::allocator_traits<
+            if (std::allocator_traits<
                 allocator_type>::propagate_on_container_copy_assignment::value) {
                 // Note: `root_` also contains the allocator and the key comparator.
                 swap(root_, x.root_);
@@ -2862,7 +2827,7 @@ namespace priv {
     template <typename P>
     void btree<P>::swap(btree &x) {
         using std::swap;
-        if (phmap::allocator_traits<
+        if (std::allocator_traits<
             allocator_type>::propagate_on_container_swap::value) {
             // Note: `root_` also contains the allocator and the key comparator.
             swap(root_, x.root_);
@@ -3297,7 +3262,7 @@ namespace priv {
         btree_container(btree_container &&x) noexcept = default;
         btree_container &operator=(const btree_container &x) = default;
         btree_container &operator=(btree_container &&x) noexcept(
-            std::is_nothrow_move_assignable<Tree>::value) = default;
+            std::is_nothrow_move_assignable_v<Tree>) = default;
 
         // Iterator routines.
         iterator begin()                       { return tree_.begin(); }
@@ -3536,8 +3501,8 @@ namespace priv {
         // `this`, it is left unmodified in `src`.
         template <
             typename T,
-            typename phmap::enable_if_t<
-                phmap::conjunction<
+            typename std::enable_if_t<
+                std::conjunction<
                     std::is_same<value_type, typename T::value_type>,
                     std::is_same<allocator_type, typename T::allocator_type>,
                     std::is_same<typename params_type::is_map_container,
@@ -3555,12 +3520,12 @@ namespace priv {
 
         template <
             typename T,
-            typename phmap::enable_if_t<
-                phmap::conjunction<
+            typename std::enable_if_t<
+                std::conjunction_v<
                     std::is_same<value_type, typename T::value_type>,
                     std::is_same<allocator_type, typename T::allocator_type>,
                     std::is_same<typename params_type::is_map_container,
-                                 typename T::params_type::is_map_container>>::value,
+                                 typename T::params_type::is_map_container>>,
                 int> = 0>
             void merge(btree_container<T> &&src) {
             merge(src);
@@ -3642,14 +3607,14 @@ namespace priv {
         mapped_type &at(const key_arg<K> &key) {
             auto it = this->find(key);
             if (it == this->end())
-                base_internal::ThrowStdOutOfRange("phmap::btree_map::at");
+                ThrowStdOutOfRange("phmap::btree_map::at");
             return it->second;
         }
         template <typename K = key_type>
         const mapped_type &at(const key_arg<K> &key) const {
             auto it = this->find(key);
             if (it == this->end())
-                base_internal::ThrowStdOutOfRange("phmap::btree_map::at");
+                ThrowStdOutOfRange("phmap::btree_map::at");
             return it->second;
         }
     };
@@ -3763,12 +3728,12 @@ namespace priv {
         // Moves all elements from `src` into `this`.
         template <
             typename T,
-            typename phmap::enable_if_t<
-                phmap::conjunction<
+            typename std::enable_if_t<
+                std::conjunction_v<
                     std::is_same<value_type, typename T::value_type>,
                     std::is_same<allocator_type, typename T::allocator_type>,
                     std::is_same<typename params_type::is_map_container,
-                                 typename T::params_type::is_map_container>>::value,
+                                 typename T::params_type::is_map_container>>,
                 int> = 0>
             void merge(btree_container<T> &src) {  // NOLINT
             insert(std::make_move_iterator(src.begin()),
@@ -3778,12 +3743,12 @@ namespace priv {
 
         template <
             typename T,
-            typename phmap::enable_if_t<
-                phmap::conjunction<
+            typename std::enable_if_t<
+                std::conjunction_v<
                     std::is_same<value_type, typename T::value_type>,
                     std::is_same<allocator_type, typename T::allocator_type>,
                     std::is_same<typename params_type::is_map_container,
-                                 typename T::params_type::is_map_container>>::value,
+                                 typename T::params_type::is_map_container>>,
                 int> = 0>
             void merge(btree_container<T> &&src) {
             merge(src);

@@ -135,12 +135,12 @@ namespace test_internal {
             return value_ >= x.value_;
         }
 
-        phmap::weak_ordering compare(const BaseCountedInstance& x) const {
+        std::weak_ordering compare(const BaseCountedInstance& x) const {
             ++num_comparisons_;
             return value_ < x.value_
-                            ? phmap::weak_ordering::less
-                            : value_ == x.value_ ? phmap::weak_ordering::equivalent
-                            : phmap::weak_ordering::greater;
+                            ? std::weak_ordering::less
+                            : value_ == x.value_ ? std::weak_ordering::equivalent
+                            : std::weak_ordering::greater;
         }
 
         size_t value() const {

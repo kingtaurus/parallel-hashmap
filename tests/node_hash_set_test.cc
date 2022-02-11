@@ -62,11 +62,11 @@ TEST(THIS_TEST_NAME, MergeExtractInsert) {
     }
   };
   phmap::THIS_HASH_SET<std::unique_ptr<int>, Hash, Eq> set1, set2;
-  set1.insert(phmap::make_unique<int>(7));
-  set1.insert(phmap::make_unique<int>(17));
+  set1.insert(std::make_unique<int>(7));
+  set1.insert(std::make_unique<int>(17));
 
-  set2.insert(phmap::make_unique<int>(7));
-  set2.insert(phmap::make_unique<int>(19));
+  set2.insert(std::make_unique<int>(7));
+  set2.insert(std::make_unique<int>(19));
 
   EXPECT_THAT(set1, UnorderedElementsAre(Pointee(7), Pointee(17)));
   EXPECT_THAT(set2, UnorderedElementsAre(Pointee(7), Pointee(19)));
@@ -76,7 +76,7 @@ TEST(THIS_TEST_NAME, MergeExtractInsert) {
   EXPECT_THAT(set1, UnorderedElementsAre(Pointee(7), Pointee(17), Pointee(19)));
   EXPECT_THAT(set2, UnorderedElementsAre(Pointee(7)));
 
-  auto node = set1.extract(phmap::make_unique<int>(7));
+  auto node = set1.extract(std::make_unique<int>(7));
   EXPECT_TRUE(node);
   EXPECT_THAT(node.value(), Pointee(7));
   EXPECT_THAT(set1, UnorderedElementsAre(Pointee(17), Pointee(19)));
@@ -90,12 +90,12 @@ TEST(THIS_TEST_NAME, MergeExtractInsert) {
   EXPECT_NE(insert_result.position->get(), insert_result.node.value().get());
   EXPECT_THAT(set2, UnorderedElementsAre(Pointee(7)));
 
-  node = set1.extract(phmap::make_unique<int>(17));
+  node = set1.extract(std::make_unique<int>(17));
   EXPECT_TRUE(node);
   EXPECT_THAT(node.value(), Pointee(17));
   EXPECT_THAT(set1, UnorderedElementsAre(Pointee(19)));
 
-  node.value() = phmap::make_unique<int>(23);
+  node.value() = std::make_unique<int>(23);
 
   insert_result = set2.insert(std::move(node));
   EXPECT_FALSE(node);

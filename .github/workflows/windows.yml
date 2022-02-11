@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest]
-        flags: ["/std:c++11", "/std:c++latest"]
+        flags: ["/std:c++latest"]
         optimize: [/O2]
     steps:
     - name: Checkout

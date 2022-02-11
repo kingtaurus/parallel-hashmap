@@ -1269,23 +1269,20 @@ namespace {
     template <typename Compare, typename K>
     void AssertKeyCompareToAdapted() {
         using Adapted = typename key_compare_to_adapter<Compare>::type;
-        static_assert(!std::is_same<Adapted, Compare>::value,
+        static_assert(!std::is_same_v<Adapted, Compare>,
                       "key_compare_to_adapter should have adapted this comparator.");
-        static_assert(
-            std::is_same<phmap::weak_ordering,
-            phmap::invoke_result_t<Adapted, const K &, const K &>>::value,
-            "Adapted comparator should be a key-compare-to comparator.");
+        static_assert(std::is_same_v<std::weak_ordering,
+                      std::invoke_result_t<Adapted, const K &, const K &>>,
+                      "Adapted comparator should be a key-compare-to comparator.");
     }
     template <typename Compare, typename K>
     void AssertKeyCompareToNotAdapted() {
         using Unadapted = typename key_compare_to_adapter<Compare>::type;
-        static_assert(
-            std::is_same<Unadapted, Compare>::value,
-            "key_compare_to_adapter shouldn't have adapted this comparator.");
-        static_assert(
-            std::is_same<bool,
-            phmap::invoke_result_t<Unadapted, const K &, const K &>>::value,
-            "Un-adapted comparator should return bool.");
+        static_assert(std::is_same_v<Unadapted, Compare>,
+                      "key_compare_to_adapter shouldn't have adapted this comparator.");
+        static_assert(std::is_same_v<bool,
+                      std::invoke_result_t<Unadapted, const K &, const K &>>,
+                      "Un-adapted comparator should return bool.");
     }
 
     TEST(Btree, KeyCompareToAdapter) {
@@ -1440,7 +1437,7 @@ namespace {
     }
 
     struct MovableOnlyInstanceThreeWayCompare {
-        phmap::weak_ordering operator()(const MovableOnlyInstance &a,
+        std::weak_ordering operator()(const MovableOnlyInstance &a,
                                         const MovableOnlyInstance &b) const {
             return a.compare(b);
         }
@@ -1654,8 +1651,8 @@ namespace {
     }
 #endif
 
-    // We can't use EXPECT_EQ/etc. to compare phmap::weak_ordering because they
-    // convert literal 0 to int and phmap::weak_ordering can only be compared with
+    // We can't use EXPECT_EQ/etc. to compare std::weak_ordering because they
+    // convert literal 0 to int and std::weak_ordering can only be compared with
     // literal 0. Defining this function allows for avoiding ClangTidy warnings.
     bool Identity(const bool b) { return b; }
 
@@ -2053,10 +2050,10 @@ namespace {
     }
 
     struct IntCompareToCmp {
-        phmap::weak_ordering operator()(int a, int b) const {
-            if (a < b) return phmap::weak_ordering::less;
-            if (a > b) return phmap::weak_ordering::greater;
-            return phmap::weak_ordering::equivalent;
+        std::weak_ordering operator()(int a, int b) const {
+            if (a < b) return std::weak_ordering::less;
+            if (a > b) return std::weak_ordering::greater;
+            return std::weak_ordering::equivalent;
         }
     };
 
@@ -2129,19 +2126,19 @@ namespace {
 
     struct KeyCompareToWeakOrdering {
         template <typename T>
-        phmap::weak_ordering operator()(const T &a, const T &b) const {
-            return a < b ? phmap::weak_ordering::less
-                       : a == b ? phmap::weak_ordering::equivalent
-                       : phmap::weak_ordering::greater;
+        std::weak_ordering operator()(const T &a, const T &b) const {
+            return a < b ? std::weak_ordering::less
+                       : a == b ? std::weak_ordering::equivalent
+                       : std::weak_ordering::greater;
         }
     };
 
     struct KeyCompareToStrongOrdering {
         template <typename T>
-        phmap::strong_ordering operator()(const T &a, const T &b) const {
-            return a < b ? phmap::strong_ordering::less
-                       : a == b ? phmap::strong_ordering::equal
-                       : phmap::strong_ordering::greater;
+        std::strong_ordering operator()(const T &a, const T &b) const {
+            return a < b ? std::strong_ordering::less
+                       : a == b ? std::strong_ordering::equal
+                       : std::strong_ordering::greater;
         }
     };
 

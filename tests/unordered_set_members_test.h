@@ -33,10 +33,10 @@ void UseType() {}
 TYPED_TEST_P(MembersTest, Typedefs) {
   EXPECT_TRUE((std::is_same<typename TypeParam::key_type,
                             typename TypeParam::value_type>()));
-  EXPECT_TRUE((phmap::conjunction<
-               phmap::negation<std::is_signed<typename TypeParam::size_type>>,
+  EXPECT_TRUE((std::conjunction<
+               std::negation<std::is_signed<typename TypeParam::size_type>>,
                std::is_integral<typename TypeParam::size_type>>()));
-  EXPECT_TRUE((phmap::conjunction<
+  EXPECT_TRUE((std::conjunction<
                std::is_signed<typename TypeParam::difference_type>,
                std::is_integral<typename TypeParam::difference_type>>()));
   EXPECT_TRUE((std::is_convertible<
