@@ -408,7 +408,7 @@ class LayoutImpl<std::tuple<Elements...>, std::index_sequence<SizeSeq...>,
 {
 private:
     static_assert(sizeof...(Elements) > 0, "At least one field is required");
-    static_assert(std::conjunction<IsLegalElementType<Elements>...>::value,
+    static_assert(std::conjunction_v<IsLegalElementType<Elements>...>,
                   "Invalid element type (see IsLegalElementType)");
 
     enum {
@@ -733,7 +733,7 @@ class Layout : public internal_layout::LayoutType<sizeof...(Ts), Ts...>
 public:
     static_assert(sizeof...(Ts) > 0, "At least one field is required");
     static_assert(
-        std::conjunction<internal_layout::IsLegalElementType<Ts>...>::value,
+        std::conjunction_v<internal_layout::IsLegalElementType<Ts>...>,
         "Invalid element type (see IsLegalElementType)");
 
     template <size_t NumSizes>

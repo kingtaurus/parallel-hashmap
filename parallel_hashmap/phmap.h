@@ -683,12 +683,10 @@ auto TupleRefImpl(T&& t, std::index_sequence<Is...>)
 template <class T>
 auto TupleRef(T&& t) -> decltype(
     TupleRefImpl(std::forward<T>(t),
-                 std::make_index_sequence<
-                     std::tuple_size<typename std::decay<T>::type>::value>())) {
+                 std::make_index_sequence<std::tuple_size_v<typename std::decay_t<T>>>())) {
   return TupleRefImpl(
       std::forward<T>(t),
-      std::make_index_sequence<
-          std::tuple_size<typename std::decay<T>::type>::value>());
+      std::make_index_sequence<std::tuple_size_v<typename std::decay_t<T>>>());
 }
 
 template <class F, class K, class V>
@@ -708,8 +706,7 @@ template <class Alloc, class T, class Tuple>
 void ConstructFromTuple(Alloc* alloc, T* ptr, Tuple&& t) {
     ConstructFromTupleImpl(
         alloc, ptr, std::forward<Tuple>(t),
-        std::make_index_sequence<
-        std::tuple_size<typename std::decay<Tuple>::type>::value>());
+        std::make_index_sequence<std::tuple_size_v<typename std::decay_t<Tuple>>>());
 }
 
 // ----------------------------------------------------------------------------
@@ -721,8 +718,7 @@ decltype(std::declval<F>()(std::declval<T>())) WithConstructed(
     Tuple&& t, F&& f) {
     return WithConstructedImpl<T>(
         std::forward<Tuple>(t),
-        std::make_index_sequence<
-        std::tuple_size<typename std::decay<Tuple>::type>::value>(),
+        std::make_index_sequence<std::tuple_size_v<typename std::decay_t<Tuple>>>(),
         std::forward<F>(f));
 }
 
@@ -825,8 +821,8 @@ public:
     using init_type  = typename Policy::init_type;
 
     using reference  = decltype(Policy::element(std::declval<slot_type*>()));
-    using pointer    = typename std::remove_reference<reference>::type*;
-    using value_type = typename std::remove_reference<reference>::type;
+    using pointer    = typename std::remove_reference_t<reference>*;
+    using value_type = typename std::remove_reference_t<reference>;
 
     // Policies can set this variable to tell raw_hash_set that all iterators
     // should be constant, even `iterator`. This is useful for set-like
@@ -1115,7 +1111,7 @@ private:
     // ----------------------------------------------------------------------------
     template <class T>
     using RequiresInsertable = typename std::enable_if<
-        std::disjunction<std::is_convertible<T, init_type>, SameAsElementReference<T>>::value,
+        std::disjunction_v<std::is_convertible<T, init_type>, SameAsElementReference<T>>,
         int>::type;
 
     // RequiresNotInit is a workaround for gcc prior to 7.1.
@@ -3204,8 +3200,8 @@ private:
 
     template <typename T>
     struct SameAsElementReference : std::is_same<
-        typename std::remove_cv<typename std::remove_reference<reference>::type>::type,
-        typename std::remove_cv<typename std::remove_reference<T>::type>::type> {};
+        typename std::remove_cv_t<typename std::remove_reference_t<reference>>,
+        typename std::remove_cv_t<typename std::remove_reference_t<T>>> {};
 
     // An enabler for insert(T&&): T must be convertible to init_type or be the
     // same as [cv] value_type [ref].
@@ -3214,15 +3210,13 @@ private:
     // cases.
     // --------------------------------------------------------------------
     template <class T>
-    using RequiresInsertable = typename std::enable_if<
-        std::disjunction<std::is_convertible<T, init_type>, SameAsElementReference<T>>::value,
-        int>::type;
+    using RequiresInsertable = typename std::enable_if_t<
+        std::disjunction_v<std::is_convertible<T, init_type>, SameAsElementReference<T>>, int>;
 
     // RequiresNotInit is a workaround for gcc prior to 7.1.
     // See https://godbolt.org/g/Y4xsUh.
     template <class T>
-    using RequiresNotInit =
-        typename std::enable_if<!std::is_same<T, init_type>::value, int>::type;
+    using RequiresNotInit = typename std::enable_if_t<!std::is_same<T, init_type>::value, int>;
 
     template <class... Ts>
     using IsDecomposable = IsDecomposable<void, PolicyTraits, Hash, Eq, Ts...>;

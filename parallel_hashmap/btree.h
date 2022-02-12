@@ -3378,11 +3378,11 @@ namespace priv {
         template <
             typename T,
             typename std::enable_if_t<
-                std::conjunction<
+                std::conjunction_v<
                     std::is_same<value_type, typename T::value_type>,
                     std::is_same<allocator_type, typename T::allocator_type>,
                     std::is_same<typename params_type::is_map_container,
-                                 typename T::params_type::is_map_container>>::value,
+                                 typename T::params_type::is_map_container>>,
                 int> = 0>
             void merge(btree_container<T> &src) {  // NOLINT
             for (auto src_it = src.begin(); src_it != src.end();) {
