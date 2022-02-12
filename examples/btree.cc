@@ -40,7 +40,8 @@ int main()
         set.insert(X((float)i, std::to_string(i)));
     set.emplace(15.0f, "15");
 
-    set.erase(X(1.0f, "1"));
+    X x((float)1, std::to_string(1));
+    set.erase(x);
     
     for (auto& e: set)
         std::cout << std::get<0>(e) << ", \"" << std::get<1>(e) << "\" \n";
