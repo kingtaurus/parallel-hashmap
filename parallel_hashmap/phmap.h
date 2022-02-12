@@ -1555,7 +1555,7 @@ public:
     // We are hitting this bug: https://godbolt.org/g/1Vht4f.
     // ----------------------------------------------------------------
     template <class T, RequiresInsertable<T> = 0,
-              typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
+              typename std::enable_if_t<IsDecomposable<const T&>::value, int> = 0>
     iterator insert(const_iterator, const T& value) {
         return insert(value).first;
     }
@@ -1647,14 +1647,13 @@ public:
     //   // Creates no std::string copies and makes no heap allocations.
     //   m.emplace("abc", "xyz");
     // -----------------------------------------------------------------
-    template <class... Args, typename std::enable_if<
-                                 IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace(Args&&... args) {
         return PolicyTraits::apply(EmplaceDecomposable{*this},
                                    std::forward<Args>(args)...);
     }
 
-    template <class... Args, typename std::enable_if<IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace_with_hash(size_t hashval, Args&&... args) {
         return PolicyTraits::apply(EmplaceDecomposableHashval{*this, hashval}, std::forward<Args>(args)...);
     }
@@ -1663,10 +1662,10 @@ public:
     // value_type unconditionally and then either moves it into the table or
     // destroys.
     // ---------------------------------------------------------------------------
-    template <class... Args, typename std::enable_if<
-                                 !IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<
+                                 !IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace(Args&&... args) {
-        typename std::aligned_storage<sizeof(slot_type), alignof(slot_type)>::type
+        typename std::aligned_storage_t<sizeof(slot_type), alignof(slot_type)>
             raw;
         slot_type* slot = reinterpret_cast<slot_type*>(&raw);
 
@@ -1675,9 +1674,9 @@ public:
         return PolicyTraits::apply(InsertSlot<true>{*this, std::move(*slot)}, elem);
     }
 
-    template <class... Args, typename std::enable_if<!IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<!IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace_with_hash(size_t hashval, Args&&... args) {
-        typename std::aligned_storage<sizeof(slot_type), alignof(slot_type)>::type raw;
+        typename std::aligned_storage_t<sizeof(slot_type), alignof(slot_type)> raw;
         slot_type* slot = reinterpret_cast<slot_type*>(&raw);
 
         PolicyTraits::construct(&alloc_ref(), slot, std::forward<Args>(args)...);
@@ -1858,9 +1857,7 @@ public:
         return node;
     }
 
-    template <
-        class K = key_type,
-        typename std::enable_if<!std::is_same<K, iterator>::value, int>::type = 0>
+    template <class K = key_type, typename std::enable_if_t<!std::is_same_v<K, iterator>, int> = 0>
     node_type extract(const key_arg<K>& key) {
         auto it = find(key);
         return it == end() ? node_type() : extract(const_iterator{it});
@@ -2282,8 +2279,7 @@ private:
         //       repeat procedure for current slot with moved from element (target)
         // ------------------------------------------------------------------------
         ConvertDeletedToEmptyAndFullToDeleted(ctrl_, capacity_);
-        typename std::aligned_storage<sizeof(slot_type), alignof(slot_type)>::type
-            raw;
+        typename std::aligned_storage_t<sizeof(slot_type), alignof(slot_type)> raw;
         slot_type* slot = reinterpret_cast<slot_type*>(&raw);
         for (size_t i = 0; i != capacity_; ++i) {
             if (!IsDeleted(ctrl_[i])) continue;
@@ -2635,16 +2631,14 @@ public:
     }
 
     template <class K = key_type, class... Args,
-              typename std::enable_if<
-                  !std::is_convertible<K, const_iterator>::value, int>::type = 0,
+              typename std::enable_if_t<!std::is_convertible_v<K, const_iterator>, int> = 0,
               K* = nullptr>
     std::pair<iterator, bool> try_emplace(key_arg<K>&& k, Args&&... args) {
         return try_emplace_impl(std::forward<K>(k), std::forward<Args>(args)...);
     }
 
     template <class K = key_type, class... Args,
-              typename std::enable_if<
-                  !std::is_convertible<K, const_iterator>::value, int>::type = 0>
+              typename std::enable_if_t<!std::is_convertible_v<K, const_iterator>, int> = 0>
     std::pair<iterator, bool> try_emplace(const key_arg<K>& k, Args&&... args) {
         return try_emplace_impl(k, std::forward<Args>(args)...);
     }
@@ -3544,7 +3538,7 @@ public:
     //   m.insert(std::make_pair("abc", 42));
     // --------------------------------------------------------------------
     template <class T, RequiresInsertable<T> = 0,
-              typename std::enable_if<IsDecomposable<T>::value, int>::type = 0,
+              typename std::enable_if_t<IsDecomposable<T>::value, int> = 0,
               T* = nullptr>
     std::pair<iterator, bool> insert(T&& value) {
         return emplace(std::forward<T>(value));
@@ -3565,9 +3559,8 @@ public:
     // RequiresInsertable<T> with RequiresInsertable<const T&>.
     // We are hitting this bug: https://godbolt.org/g/1Vht4f.
     // --------------------------------------------------------------------
-    template <
-        class T, RequiresInsertable<T> = 0,
-        typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
+    template <class T, RequiresInsertable<T> = 0,
+              typename std::enable_if_t<IsDecomposable<const T&>::value, int> = 0>
     std::pair<iterator, bool> insert(const T& value) {
         return emplace(value);
     }
@@ -3583,7 +3576,7 @@ public:
     }
 
     template <class T, RequiresInsertable<T> = 0,
-              typename std::enable_if<IsDecomposable<T>::value, int>::type = 0,
+              typename std::enable_if_t<IsDecomposable<T>::value, int> = 0,
               T* = nullptr>
     iterator insert(const_iterator, T&& value) {
         return insert(std::forward<T>(value)).first;
@@ -3595,7 +3588,7 @@ public:
     // --------------------------------------------------------------------
     template <
         class T, RequiresInsertable<T> = 0,
-        typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
+        typename std::enable_if_t<IsDecomposable<const T&>::value, int> = 0>
     iterator insert(const_iterator, const T& value) {
         return insert(value).first;
     }
@@ -3679,8 +3672,7 @@ public:
     //   // Creates no std::string copies and makes no heap allocations.
     //   m.emplace("abc", "xyz");
     // --------------------------------------------------------------------
-    template <class... Args, typename std::enable_if<
-                                 IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace_with_hash(size_t hashval, Args&&... args) {
         return PolicyTraits::apply(EmplaceDecomposableHashval{*this, hashval},
                                    std::forward<Args>(args)...);
@@ -3690,10 +3682,9 @@ public:
     // value_type unconditionally and then either moves it into the table or
     // destroys.
     // --------------------------------------------------------------------
-    template <class... Args, typename std::enable_if<
-                                 !IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<!IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace_with_hash(size_t hashval, Args&&... args) {
-        typename std::aligned_storage<sizeof(slot_type), alignof(slot_type)>::type raw;
+        typename std::aligned_storage_t<sizeof(slot_type), alignof(slot_type)> raw;
         slot_type* slot = reinterpret_cast<slot_type*>(&raw);
 
         PolicyTraits::construct(&alloc_ref(), slot, std::forward<Args>(args)...);
@@ -3752,8 +3743,7 @@ public:
     //   // Creates no std::string copies and makes no heap allocations.
     //   m.emplace("abc", "xyz");
     // --------------------------------------------------------------------
-    template <class... Args, typename std::enable_if<
-                                 IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace(Args&&... args) {
         return PolicyTraits::apply(EmplaceDecomposable{*this},
                                    std::forward<Args>(args)...);
@@ -3763,10 +3753,9 @@ public:
     // value_type unconditionally and then either moves it into the table or
     // destroys.
     // --------------------------------------------------------------------
-    template <class... Args, typename std::enable_if<
-                                 !IsDecomposable<Args...>::value, int>::type = 0>
+    template <class... Args, typename std::enable_if_t<!IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace(Args&&... args) {
-        typename std::aligned_storage<sizeof(slot_type), alignof(slot_type)>::type raw;
+        typename std::aligned_storage_t<sizeof(slot_type), alignof(slot_type)> raw;
         slot_type* slot = reinterpret_cast<slot_type*>(&raw);
         size_t hashval  = this->hash(PolicyTraits::key(slot));
 
@@ -4021,7 +4010,7 @@ public:
 
     template <
         class K = key_type,
-        typename std::enable_if<!std::is_same<K, iterator>::value, int>::type = 0>
+        typename std::enable_if_t<!std::is_same_v<K, iterator>, int> = 0>
     node_type extract(const key_arg<K>& key) {
         auto it = find(key);
         return it == end() ? node_type() : extract(const_iterator{it});
@@ -4439,16 +4428,14 @@ public:
     }
 
     template <class K = key_type, class... Args,
-              typename std::enable_if<
-                  !std::is_convertible<K, const_iterator>::value, int>::type = 0,
+              typename std::enable_if_t<!std::is_convertible_v<K, const_iterator>, int> = 0,
               K* = nullptr>
     std::pair<iterator, bool> try_emplace(key_arg<K>&& k, Args&&... args) {
         return try_emplace_impl(std::forward<K>(k), std::forward<Args>(args)...);
     }
 
     template <class K = key_type, class... Args,
-              typename std::enable_if<
-                  !std::is_convertible<K, const_iterator>::value, int>::type = 0>
+              typename std::enable_if_t<!std::is_convertible_v<K, const_iterator>, int> = 0>
     std::pair<iterator, bool> try_emplace(const key_arg<K>& k, Args&&... args) {
         return try_emplace_impl(k, std::forward<Args>(args)...);
     }
@@ -4482,16 +4469,14 @@ public:
     // ----------- phmap extensions --------------------------
 
     template <class K = key_type, class... Args,
-              typename std::enable_if<
-                  !std::is_convertible<K, const_iterator>::value, int>::type = 0,
+              typename std::enable_if_t<!std::is_convertible_v<K, const_iterator>, int> = 0,
               K* = nullptr>
     std::pair<iterator, bool> try_emplace_with_hash(size_t hashval, key_arg<K>&& k, Args&&... args) {
         return try_emplace_impl_with_hash(hashval, std::forward<K>(k), std::forward<Args>(args)...);
     }
 
     template <class K = key_type, class... Args,
-              typename std::enable_if<
-                  !std::is_convertible<K, const_iterator>::value, int>::type = 0>
+              typename std::enable_if_t<!std::is_convertible_v<K, const_iterator>, int> = 0>
     std::pair<iterator, bool> try_emplace_with_hash(size_t hashval, const key_arg<K>& k, Args&&... args) {
         return try_emplace_impl_with_hash(hashval, k, std::forward<Args>(args)...);
     }
@@ -4687,8 +4672,7 @@ template <class Reference, class Policy>
 struct node_hash_policy {
     static_assert(std::is_lvalue_reference<Reference>::value, "");
 
-    using slot_type = typename std::remove_cv<
-        typename std::remove_reference<Reference>::type>::type*;
+    using slot_type = typename std::remove_cv_t<typename std::remove_reference_t<Reference>> *;
 
     template <class Alloc, class... Args>
     static void construct(Alloc* alloc, slot_type* slot, Args&&... args) {
