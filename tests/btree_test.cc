@@ -2042,7 +2042,7 @@ namespace {
     }
 
     struct IntCompareToCmp {
-        std::weak_ordering operator()(int a, int b) const {
+        std::weak_ordering operator()(const int &a, const int &b) const {
             if (a < b) return std::weak_ordering::less;
             if (a > b) return std::weak_ordering::greater;
             return std::weak_ordering::equivalent;

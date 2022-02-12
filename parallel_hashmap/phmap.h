@@ -191,7 +191,7 @@ int LeadingZeros(T x) {
 template <class T, int SignificantBits, int Shift = 0>
 class BitMask 
 {
-    static_assert(std::is_unsigned<T>::value, "");
+    static_assert(std::is_unsigned_v<T>, "");
     static_assert(Shift == 0 || Shift == 3, "");
 
 public:
@@ -337,7 +337,7 @@ inline __m128i _mm_cmpgt_epi8_fixed(__m128i a, __m128i b) {
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Woverflow"
 
-  if (std::is_unsigned<char>::value) {
+  if (std::is_unsigned_v<char>) {
     const __m128i mask = _mm_set1_epi8(static_cast<char>(0x80));
     const __m128i diff = _mm_subs_epi8(b, a);
     return _mm_cmpeq_epi8(_mm_and_si128(diff, mask), mask);
