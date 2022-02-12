@@ -333,8 +333,7 @@ template <class T, class... Ts>
 using Contains = std::disjunction<std::is_same<T, Ts>...>;
 
 template <class From, class To>
-using CopyConst =
-    typename std::conditional<std::is_const<From>::value, const To, To>::type;
+using CopyConst = typename std::conditional_t<std::is_const_v<From>, const To, To>;
 
 // Note: We're not qualifying this with phmap:: because it doesn't compile under
 // MSVC.
@@ -375,16 +374,16 @@ constexpr size_t Max(size_t a, size_t b, Ts... rest) {
 }  // namespace adl_barrier
 
 template <bool C>
-using EnableIf = typename std::enable_if<C, int>::type;
+using EnableIf = typename std::enable_if_t<C, int>;
 
 // Can `T` be a template argument of `Layout`?
 // ---------------------------------------------------------------------------
 template <class T>
 using IsLegalElementType = std::integral_constant<
-    bool, !std::is_reference<T>::value && !std::is_volatile<T>::value &&
-              !std::is_reference<typename Type<T>::type>::value &&
-              !std::is_volatile<typename Type<T>::type>::value &&
-              adl_barrier::IsPow2(AlignOf<T>::value)>;
+    bool, !std::is_reference_v<T> && !std::is_volatile_v<T> &&
+    !std::is_reference_v<typename Type<T>::type> &&
+    !std::is_volatile_v<typename Type<T>::type> &&
+    adl_barrier::IsPow2(AlignOf<T>::value)>;
 
 template <class Elements, class SizeSeq, class OffsetSeq>
 class LayoutImpl;
@@ -426,10 +425,8 @@ private:
     // if `Elements...` doesn't contain exactly one instance of `T`.
     template <class T>
         static constexpr size_t ElementIndex() {
-        static_assert(Contains<Type<T>, Type<typename Type<Elements>::type>...>(),
-                      "Type not found");
-        return adl_barrier::Find(Type<T>(),
-                                 Type<typename Type<Elements>::type>()...);
+        static_assert(Contains<Type<T>, Type<typename Type<Elements>::type>...>(), "Type not found");
+        return adl_barrier::Find(Type<T>(), Type<typename Type<Elements>::type>()...);
     }
 
     template <size_t N>
@@ -544,7 +541,7 @@ public:
     // ----------------------------------------------------------------------------
     template <size_t N, class Char>
         CopyConst<Char, ElementType<N>>* Pointer(Char* p) const {
-        using C = typename std::remove_const<Char>::type;
+        using C = typename std::remove_const_t<Char>;
         static_assert(
             std::is_same<C, char>() || std::is_same<C, unsigned char>() ||
             std::is_same<C, signed char>(),
@@ -805,7 +802,7 @@ constexpr bool ShouldUseBase() {
     // assertion failed at: "shared/cfe/edgcpfe/lower_init.c", line 7013
     return false; 
 #else
-    return std::is_class<T>::value && std::is_empty<T>::value && !IsFinal<T>();
+    return std::is_class_v<T> && std::is_empty_v<T> && !IsFinal<T>();
 #endif
 }
 
@@ -849,8 +846,7 @@ struct PHMAP_INTERNAL_COMPRESSED_TUPLE_DECLSPEC
     // convince MSVC of accepting and expanding I in that context. Without it
     // you would get:
     //   error C3548: 'I': parameter pack cannot be used in this context
-    : Storage<CompressedTuple<Ts...>,
-              std::integral_constant<size_t, I>::value>... 
+    : Storage<CompressedTuple<Ts...>, std::integral_constant<size_t, I>::value>... 
 {
     constexpr CompressedTupleImpl() = default;
     explicit constexpr CompressedTupleImpl(Ts&&... args)

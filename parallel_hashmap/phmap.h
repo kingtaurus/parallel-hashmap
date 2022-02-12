@@ -67,9 +67,7 @@
 #include <mutex>  // for std::lock
 
 #include "phmap_config.h"
-#ifdef PHMAP_HAVE_SHARED_MUTEX
-    #include <shared_mutex>  // after "phmap_config.h"
-#endif
+#include <shared_mutex>  // after "phmap_config.h"
 
 #include "phmap_fwd_decl.h"
 #include "phmap_utils.h"
@@ -1122,9 +1120,9 @@ private:
     using IsDecomposable = IsDecomposable<void, PolicyTraits, Hash, Eq, Ts...>;
 
 public:
-    static_assert(std::is_same<pointer, value_type*>::value,
+    static_assert(std::is_same_v<pointer, value_type*>,
                   "Allocators with custom pointer types are not supported");
-    static_assert(std::is_same<const_pointer, const value_type*>::value,
+    static_assert(std::is_same_v<const_pointer, const value_type*>,
                   "Allocators with custom pointer types are not supported");
 
     class iterator 
@@ -1256,9 +1254,9 @@ public:
     using insert_return_type = InsertReturnType<iterator, node_type>;
 
     raw_hash_set() noexcept(
-        std::is_nothrow_default_constructible<hasher>::value&&
-        std::is_nothrow_default_constructible<key_equal>::value&&
-        std::is_nothrow_default_constructible<allocator_type>::value) {}
+        std::is_nothrow_default_constructible_v<hasher> &&
+        std::is_nothrow_default_constructible_v<key_equal> &&
+        std::is_nothrow_default_constructible_v<allocator_type>) {}
 
     explicit raw_hash_set(size_t bucket_cnt, const hasher& hashfn = hasher(),
                           const key_equal& eq = key_equal(),
@@ -1384,10 +1382,9 @@ public:
         growth_left() -= that.size();
     }
 
-    raw_hash_set(raw_hash_set&& that) noexcept(
-        std::is_nothrow_copy_constructible<hasher>::value&&
-        std::is_nothrow_copy_constructible<key_equal>::value&&
-        std::is_nothrow_copy_constructible<allocator_type>::value)
+    raw_hash_set(raw_hash_set&& that) noexcept(std::is_nothrow_copy_constructible_v<hasher> &&
+                                               std::is_nothrow_copy_constructible_v<key_equal> &&
+                                               std::is_nothrow_copy_constructible_v<allocator_type>)
         : ctrl_(std::exchange(that.ctrl_, EmptyGroup())),
         slots_(std::exchange(that.slots_, nullptr)),
         size_(std::exchange(that.size_, 0)),
@@ -1435,8 +1432,8 @@ public:
 
     raw_hash_set& operator=(raw_hash_set&& that) noexcept(
         std::allocator_traits<allocator_type>::is_always_equal::value&&
-        std::is_nothrow_move_assignable<hasher>::value&&
-        std::is_nothrow_move_assignable<key_equal>::value) {
+        std::is_nothrow_move_assignable_v<hasher> &&
+        std::is_nothrow_move_assignable_v<key_equal>) {
         // TODO(sbenza): We should only use the operations from the noexcept clause
         // to make sure we actually adhere to that contract.
         return move_assign(
@@ -1580,7 +1577,7 @@ public:
         template<typename>   static no   test(...);
  
     public:
-        static constexpr bool value = std::is_same<decltype(test<T>(0)), yes>::value;
+        static constexpr bool value = std::is_same_v<decltype(test<T>(0)), yes>;
     };
 
     template <class InputIt, typename std::enable_if_t<has_difference_operator<InputIt>::value, int> = 0>
@@ -1662,8 +1659,7 @@ public:
     // value_type unconditionally and then either moves it into the table or
     // destroys.
     // ---------------------------------------------------------------------------
-    template <class... Args, typename std::enable_if_t<
-                                 !IsDecomposable<Args...>::value, int> = 0>
+    template <class... Args, typename std::enable_if_t<!IsDecomposable<Args...>::value, int> = 0>
     std::pair<iterator, bool> emplace(Args&&... args) {
         typename std::aligned_storage_t<sizeof(slot_type), alignof(slot_type)>
             raw;
@@ -2197,7 +2193,7 @@ private:
 
     void initialize_slots(size_t new_capacity) {
         assert(new_capacity);
-        if (std::is_same<SlotAlloc, std::allocator<slot_type>>::value && 
+        if (std::is_same_v<SlotAlloc, std::allocator<slot_type>> && 
             slots_ == nullptr) {
             infoz_ = Sample();
         }
@@ -2558,8 +2554,7 @@ class raw_hash_map : public raw_hash_set<Policy, Hash, Eq, Alloc>
     using MappedConstReference = decltype(P::value(
                std::addressof(std::declval<typename raw_hash_map::const_reference>())));
 
-    using KeyArgImpl =
-        KeyArg<IsTransparent<Eq>::value && IsTransparent<Hash>::value>;
+    using KeyArgImpl =  KeyArg<IsTransparent<Eq>::value && IsTransparent<Hash>::value>;
 
     using Base = raw_hash_set<Policy, Hash, Eq, Alloc>;
 
@@ -2569,10 +2564,10 @@ public:
     template <class K>
     using key_arg = typename KeyArgImpl::template type<K, key_type>;
 
-    static_assert(!std::is_reference<key_type>::value, "");
+    static_assert(!std::is_reference_v<key_type>, "");
     // TODO(alkis): remove this assertion and verify that reference mapped_type is
     // supported.
-    static_assert(!std::is_reference<mapped_type>::value, "");
+    static_assert(!std::is_reference_v<mapped_type>, "");
 
     using iterator = typename raw_hash_map::raw_hash_set::iterator;
     using const_iterator = typename raw_hash_map::raw_hash_set::const_iterator;
@@ -2706,13 +2701,8 @@ private:
 // Returns "random" seed.
 inline size_t RandomSeed() 
 {
-#if PHMAP_HAVE_THREAD_LOCAL
     static thread_local size_t counter = 0;
     size_t value = ++counter;
-#else   // PHMAP_HAVE_THREAD_LOCAL
-    static std::atomic<size_t> counter(0);
-    size_t value = counter.fetch_add(1, std::memory_order_relaxed);
-#endif  // PHMAP_HAVE_THREAD_LOCAL
     return value ^ static_cast<size_t>(reinterpret_cast<uintptr_t>(&counter));
 }
 
@@ -3086,23 +3076,19 @@ public:
 // --------------------------------------------------------------------------
 //         std::shared_mutex support (read and write lock support)
 // --------------------------------------------------------------------------
-#ifdef PHMAP_HAVE_SHARED_MUTEX
-
-    // ---------------------------------------------------------------------------
-    template <>
-    class  LockableImpl<std::shared_mutex> : public std::shared_mutex
-    {
-    public:
-        using mutex_type      = std::shared_mutex;
-        using Base            = LockableBaseImpl<std::shared_mutex>;
-        using SharedLock      = std::shared_lock<mutex_type>;
-        using UpgradeLock     = std::unique_lock<mutex_type>; // assume can't upgrade
-        using UniqueLock      = std::unique_lock<mutex_type>;
-        using SharedLocks     = typename Base::ReadLocks;
-        using UniqueLocks     = typename Base::WriteLocks;
-        using UpgradeToUnique = typename Base::DoNothing;  // we already have unique ownership
-    };
-#endif // PHMAP_HAVE_SHARED_MUTEX
+template <>
+class  LockableImpl<std::shared_mutex> : public std::shared_mutex
+{
+public:
+    using mutex_type      = std::shared_mutex;
+    using Base            = LockableBaseImpl<std::shared_mutex>;
+    using SharedLock      = std::shared_lock<mutex_type>;
+    using UpgradeLock     = std::unique_lock<mutex_type>; // assume can't upgrade
+    using UniqueLock      = std::unique_lock<mutex_type>;
+    using SharedLocks     = typename Base::ReadLocks;
+    using UniqueLocks     = typename Base::WriteLocks;
+    using UpgradeToUnique = typename Base::DoNothing;  // we already have unique ownership
+};
 
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -3113,8 +3099,7 @@ template <size_t N,
 class parallel_hash_set 
 {
     using PolicyTraits = hash_policy_traits<Policy>;
-    using KeyArgImpl =
-        KeyArg<IsTransparent<Eq>::value && IsTransparent<Hash>::value>;
+    using KeyArgImpl =  KeyArg<IsTransparent<Eq>::value && IsTransparent<Hash>::value>;
 
     static_assert(N <= 12, "N = 12 means 4096 hash tables!");
     constexpr static size_t num_tables = 1 << N;
@@ -3186,7 +3171,7 @@ private:
 
     using AllocTraits     = std::allocator_traits<allocator_type>;
 
-    static_assert(std::is_lvalue_reference<reference>::value,
+    static_assert(std::is_lvalue_reference_v<reference>,
                   "Policy::element() must return a reference");
 
     template <typename T>
@@ -3207,15 +3192,15 @@ private:
     // RequiresNotInit is a workaround for gcc prior to 7.1.
     // See https://godbolt.org/g/Y4xsUh.
     template <class T>
-    using RequiresNotInit = typename std::enable_if_t<!std::is_same<T, init_type>::value, int>;
+    using RequiresNotInit = typename std::enable_if_t<!std::is_same_v<T, init_type>, int>;
 
     template <class... Ts>
     using IsDecomposable = IsDecomposable<void, PolicyTraits, Hash, Eq, Ts...>;
 
 public:
-    static_assert(std::is_same<pointer, value_type*>::value,
+    static_assert(std::is_same_v<pointer, value_type*>,
                   "Allocators with custom pointer types are not supported");
-    static_assert(std::is_same<const_pointer, const value_type*>::value,
+    static_assert(std::is_same_v<const_pointer, const value_type*>,
                   "Allocators with custom pointer types are not supported");
 
     // --------------------- i t e r a t o r ------------------------------
@@ -3336,9 +3321,9 @@ public:
     // ------------------------- c o n s t r u c t o r s ------------------
 
     parallel_hash_set() noexcept(
-        std::is_nothrow_default_constructible<hasher>::value&&
-        std::is_nothrow_default_constructible<key_equal>::value&&
-        std::is_nothrow_default_constructible<allocator_type>::value) {}
+        std::is_nothrow_default_constructible_v<hasher> &&
+        std::is_nothrow_default_constructible_v<key_equal> &&
+        std::is_nothrow_default_constructible_v<allocator_type>) {}
 
     explicit parallel_hash_set(size_t bucket_cnt, 
                                const hasher& hash_param    = hasher(),
@@ -3455,10 +3440,9 @@ public:
             sets_[i].set_ = { that.sets_[i].set_, a };
     }
   
-    parallel_hash_set(parallel_hash_set&& that) noexcept(
-        std::is_nothrow_copy_constructible<hasher>::value&&
-        std::is_nothrow_copy_constructible<key_equal>::value&&
-        std::is_nothrow_copy_constructible<allocator_type>::value)
+    parallel_hash_set(parallel_hash_set&& that) noexcept(std::is_nothrow_copy_constructible_v<hasher> &&
+                                                         std::is_nothrow_copy_constructible_v<key_equal> &&
+                                                         std::is_nothrow_copy_constructible_v<allocator_type>)
         : parallel_hash_set(std::move(that), that.alloc_ref()) {
     }
 
@@ -3474,10 +3458,9 @@ public:
         return *this;
     }
 
-    parallel_hash_set& operator=(parallel_hash_set&& that) noexcept(
-        std::allocator_traits<allocator_type>::is_always_equal::value &&
-        std::is_nothrow_move_assignable<hasher>::value &&
-        std::is_nothrow_move_assignable<key_equal>::value) {
+    parallel_hash_set& operator=(parallel_hash_set&& that) noexcept(std::allocator_traits<allocator_type>::is_always_equal::value &&
+                                                                    std::is_nothrow_move_assignable_v<hasher> &&
+                                                                    std::is_nothrow_move_assignable_v<key_equal>) {
         for (size_t i=0; i<num_tables; ++i)
             sets_[i].set_ = std::move(that.sets_[i].set_);
         return *this;
@@ -3844,9 +3827,7 @@ public:
     // -----------------------------------------------------------------------------------------
     template <class K = key_type, class F, class L>
     bool modify_if_impl(const key_arg<K>& key, F&& f) {
-#if __cplusplus >= 201703L
-        static_assert(std::is_invocable<F, value_type&>::value);
-#endif
+        static_assert(std::is_invocable_v<F, value_type&>);
         L m;
         auto ptr = this->template find_ptr<K, L>(key, this->hash(key), m);
         if (ptr == nullptr)
@@ -3867,9 +3848,7 @@ public:
 
     template <class K = key_type, class F, class L>
     bool erase_if_impl(const key_arg<K>& key, F&& f) {
-#if __cplusplus >= 201703L
-        static_assert(std::is_invocable<F, value_type&>::value);
-#endif
+        static_assert(std::is_invocable_v<F, value_type&>);
         L m;
         auto it = this->template find<K, L>(key, this->hash(key), m);
         if (it == this->end()) return false;
@@ -4362,10 +4341,10 @@ public:
     template <class K>
     using key_arg = typename KeyArgImpl::template type<K, key_type>;
 
-    static_assert(!std::is_reference<key_type>::value, "");
+    static_assert(!std::is_reference_v<key_type>, "");
     // TODO(alkis): remove this assertion and verify that reference mapped_type is
     // supported.
-    static_assert(!std::is_reference<mapped_type>::value, "");
+    static_assert(!std::is_reference_v<mapped_type>, "");
 
     using iterator = typename parallel_hash_map::parallel_hash_set::iterator;
     using const_iterator = typename parallel_hash_map::parallel_hash_set::const_iterator;
@@ -4670,7 +4649,7 @@ struct FlatHashMapPolicy
 
 template <class Reference, class Policy>
 struct node_hash_policy {
-    static_assert(std::is_lvalue_reference<Reference>::value, "");
+    static_assert(std::is_lvalue_reference_v<Reference>, "");
 
     using slot_type = typename std::remove_cv_t<typename std::remove_reference_t<Reference>> *;
 
