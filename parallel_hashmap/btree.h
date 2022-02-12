@@ -2426,7 +2426,7 @@ namespace priv {
     template <typename P>
     template <typename InputIterator>
     void btree<P>::insert_iterator_multi(InputIterator b, InputIterator e) {
-        for (; b != e; ++b) {
+        for (; !(b == e); ++b) {
             insert_hint_multi(end(), *b);
         }
     }

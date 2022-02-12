@@ -1093,15 +1093,13 @@ private:
     using SlotAllocTraits = typename std::allocator_traits<
         allocator_type>::template rebind_traits<slot_type>;
 
-    static_assert(std::is_lvalue_reference<reference>::value,
+    static_assert(std::is_lvalue_reference_v<reference>,
                   "Policy::element() must return a reference");
 
     template <typename T>
     struct SameAsElementReference
-        : std::is_same<typename std::remove_cv<
-                           typename std::remove_reference<reference>::type>::type,
-                       typename std::remove_cv<
-                           typename std::remove_reference<T>::type>::type> {};
+        : std::is_same<typename std::remove_cv_t<typename std::remove_reference_t<reference>>,
+                       typename std::remove_cv_t<typename std::remove_reference_t<T>>> {};
 
     // An enabler for insert(T&&): T must be convertible to init_type or be the
     // same as [cv] value_type [ref].
@@ -1110,16 +1108,15 @@ private:
     // cases.
     // ----------------------------------------------------------------------------
     template <class T>
-    using RequiresInsertable = typename std::enable_if<
+    using RequiresInsertable = typename std::enable_if_t<
         std::disjunction_v<std::is_convertible<T, init_type>, SameAsElementReference<T>>,
-        int>::type;
+        int>;
 
     // RequiresNotInit is a workaround for gcc prior to 7.1.
     // See https://godbolt.org/g/Y4xsUh.
     // ----------------------------------------------------------------------------
     template <class T>
-    using RequiresNotInit =
-        typename std::enable_if<!std::is_same<T, init_type>::value, int>::type;
+    using RequiresNotInit = typename std::enable_if_t<!std::is_same_v<T, init_type>, int>;
 
     template <class... Ts>
     using IsDecomposable = IsDecomposable<void, PolicyTraits, Hash, Eq, Ts...>;
@@ -1509,7 +1506,7 @@ public:
     //   m.insert(std::make_pair("abc", 42));
     // -----------------------------------------------------------------------
     template <class T, RequiresInsertable<T> = 0,
-              typename std::enable_if<IsDecomposable<T>::value, int>::type = 0,
+              typename std::enable_if_t<IsDecomposable<T>::value, int> = 0,
               T* = nullptr>
     std::pair<iterator, bool> insert(T&& value) {
         return emplace(std::forward<T>(value));
@@ -1531,7 +1528,7 @@ public:
     // We are hitting this bug: https://godbolt.org/g/1Vht4f.
     // ----------------------------------------------------------------
     template <class T, RequiresInsertable<T> = 0,
-              typename std::enable_if<IsDecomposable<const T&>::value, int>::type = 0>
+              typename std::enable_if_t<IsDecomposable<const T&>::value, int> = 0>
     std::pair<iterator, bool> insert(const T& value) {
         return emplace(value);
     }
@@ -1547,7 +1544,7 @@ public:
     }
 
     template <class T, RequiresInsertable<T> = 0,
-              typename std::enable_if<IsDecomposable<T>::value, int>::type = 0,
+              typename std::enable_if_t<IsDecomposable<T>::value, int> = 0,
               T* = nullptr>
     iterator insert(const_iterator, T&& value) {
         return insert(std::forward<T>(value)).first;
