@@ -75,9 +75,7 @@
 #include "phmap_utils.h"
 #include "phmap_base.h"
 
-#if PHMAP_HAVE_STD_STRING_VIEW
-    #include <string_view>
-#endif
+#include <string_view>
 
 namespace phmap {
 
@@ -4827,8 +4825,6 @@ public:
 //  hash_default
 // --------------------------------------------------------------------------
 
-#if PHMAP_HAVE_STD_STRING_VIEW
-
 // support char16_t wchar_t ....
 template<class CharT> 
 struct StringHashT 
@@ -4875,8 +4871,6 @@ struct HashEq<std::wstring> : StringHashEqT<wchar_t> {};
 
 template <>
 struct HashEq<std::wstring_view> : StringHashEqT<wchar_t> {};
-
-#endif
 
 // Supports heterogeneous lookup for pointers and smart pointers.
 // -------------------------------------------------------------

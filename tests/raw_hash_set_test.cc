@@ -34,9 +34,7 @@
     #pragma warning(disable : 4018 4244 4702)
 #endif  // _MSC_VER
 
-#if PHMAP_HAVE_STD_STRING_VIEW
-    #include <string_view>
-#endif
+#include <string_view>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -274,7 +272,6 @@ struct IntPolicy {
   }
 };
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 class StringPolicy {
   template <class F, class K, class V,
             class = typename std::enable_if<
@@ -346,7 +343,6 @@ struct StringTable
   StringTable() {}
   using Base::Base;
 };
-#endif
 
 struct IntTable
     : raw_hash_set<IntPolicy, priv::hash_default_hash<int64_t>,
@@ -389,7 +385,6 @@ struct BadTable : raw_hash_set<IntPolicy, BadFastHash, std::equal_to<int>,
   using Base::Base;
 };
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, EmptyFunctorOptimization) {
   static_assert(std::is_empty<std::equal_to<std::string_view>>::value, "");
   static_assert(std::is_empty<std::allocator<int>>::value, "");
@@ -421,7 +416,6 @@ TEST(Table, EmptyFunctorOptimization) {
           raw_hash_set<StringPolicy, StatefulHash,
                        std::equal_to<std::string_view>, std::allocator<int>>));
 }
-#endif
 
 TEST(Table, Empty) {
   IntTable t;
@@ -555,7 +549,6 @@ TEST(Table, InsertCollisionAndFindAfterDelete) {
   EXPECT_TRUE(t.empty());
 }
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, LazyEmplace) {
   StringTable t;
   bool called = false;
@@ -573,7 +566,6 @@ TEST(Table, LazyEmplace) {
   EXPECT_FALSE(called);
   EXPECT_THAT(*it, Pair("abc", "ABC"));
 }
-#endif
 
 TEST(Table, ContainsEmpty) {
   IntTable t;
@@ -815,7 +807,6 @@ TEST(Table, InsertEraseStressTest) {
   }
 }
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, InsertOverloads) {
   StringTable t;
   // These should all trigger the insert(init_type) overload.
@@ -826,7 +817,6 @@ TEST(Table, InsertOverloads) {
   EXPECT_THAT(t, UnorderedElementsAre(Pair("", ""), Pair("ABC", ""),
                                       Pair("DEF", "!!!")));
 }
-#endif
 
 TEST(Table, LargeTable) {
   IntTable t;
@@ -1391,7 +1381,6 @@ TEST(Table, RehashZeroForcesRehash) {
   EXPECT_NE(p, &*t.find(0));
 }
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, ConstructFromInitList) {
   using P = std::pair<std::string, std::string>;
   struct Q {
@@ -1399,7 +1388,6 @@ TEST(Table, ConstructFromInitList) {
   };
   StringTable t = {P(), Q(), {}, {{}, {}}};
 }
-#endif
 
 TEST(Table, CopyConstruct) {
   IntTable t;
@@ -1422,7 +1410,6 @@ TEST(Table, CopyConstruct) {
   }
 }
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, CopyConstructWithAlloc) {
   StringTable t;
   t.emplace("a", "b");
@@ -1543,7 +1530,6 @@ TEST(Table, Equality3) {
   u.insert(std::begin(v2), std::end(v2));
   EXPECT_NE(u, t);
 }
-#endif
 
 TEST(Table, NumDeletedRegression) {
   IntTable t;
@@ -1583,7 +1569,6 @@ TEST(Table, ReplacingDeletedSlotDoesNotRehash) {
   EXPECT_EQ(c, t.bucket_count()) << "rehashing threshold = " << n;
 }
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, NoThrowMoveConstruct) {
   ASSERT_TRUE(
       std::is_nothrow_copy_constructible<phmap::Hash<std::string_view>>::value);
@@ -1612,7 +1597,6 @@ TEST(Table, NoThrowSwappable) {
   ASSERT_TRUE(priv::IsNoThrowSwappable<std::allocator<int>>());
   EXPECT_TRUE(priv::IsNoThrowSwappable<StringTable>());
 }
-#endif
 
 TEST(Table, HeterogeneousLookup) {
   struct Hash {
@@ -1681,7 +1665,6 @@ struct VerifyResultOf : std::false_type {};
 template <template <typename> class C, class Table>
 struct VerifyResultOf<C, Table, std::void_t<C<Table>>> : std::true_type {};
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(Table, HeterogeneousLookupOverloads) {
   using NonTransparentTable =
       raw_hash_set<StringPolicy, phmap::Hash<std::string_view>,
@@ -1797,8 +1780,6 @@ TEST(Nodes, ExtractInsert) {
   EXPECT_TRUE(res.node);
   EXPECT_FALSE(node);
 }
-
-#endif
 
 IntTable MakeSimpleTable(size_t size) {
   IntTable t;

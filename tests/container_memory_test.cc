@@ -18,9 +18,7 @@
 #include <tuple>
 #include <utility>
 
-#if PHMAP_HAVE_STD_STRING_VIEW
-    #include <string_view>
-#endif
+#include <string_view>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -103,13 +101,11 @@ TEST(PairArgs, Piecewise) {
                std::forward_as_tuple('A')));
 }
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(WithConstructed, Simple) {
   EXPECT_EQ(1, WithConstructed<std::string_view>(
                    std::make_tuple(std::string("a")),
                    [](std::string_view str) { return str.size(); }));
 }
-#endif
 
 template <class F, class Arg>
 decltype(DecomposeValue(std::declval<F>(), std::declval<Arg>()))

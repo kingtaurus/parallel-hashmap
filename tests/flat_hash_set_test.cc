@@ -49,13 +49,11 @@ INSTANTIATE_TYPED_TEST_SUITE_P(THIS_TEST_NAME, LookupTest, SetTypes);
 INSTANTIATE_TYPED_TEST_SUITE_P(THIS_TEST_NAME, MembersTest, SetTypes);
 INSTANTIATE_TYPED_TEST_SUITE_P(THIS_TEST_NAME, ModifiersTest, SetTypes);
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 TEST(THIS_TEST_NAME, EmplaceString) {
   std::vector<std::string> v = {"a", "b"};
   phmap::THIS_HASH_SET<std::string_view> hs(v.begin(), v.end());
   //EXPECT_THAT(hs, UnorderedElementsAreArray(v));
 }
-#endif
 
 TEST(THIS_TEST_NAME, BitfieldArgument) {
   union {

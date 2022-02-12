@@ -66,9 +66,7 @@
 #include "phmap_fwd_decl.h"
 #include "phmap_base.h"
 
-#if PHMAP_HAVE_STD_STRING_VIEW
-    #include <string_view>
-#endif
+#include <string_view>
 
 // MSVC constructibility traits do not detect destructor properties and so our
 // implementations should not use them as a source-of-truth.
@@ -408,7 +406,6 @@ namespace priv {
 
         // Compatibility constructor.
         StringBtreeDefaultLess(std::less<std::string>) {}       // NOLINT
-#if PHMAP_HAVE_STD_STRING_VIEW
         StringBtreeDefaultLess(std::less<std::string_view>) {}  // NOLINT
         StringBtreeDefaultLess(phmap::Less<std::string_view>) {}  // NOLINT
 
@@ -416,12 +413,6 @@ namespace priv {
                                       std::string_view rhs) const {
             return compare_internal::compare_result_as_ordering(lhs.compare(rhs));
         }
-#else
-        std::weak_ordering operator()(std::string lhs,
-                                      std::string rhs) const {
-            return compare_internal::compare_result_as_ordering(lhs.compare(rhs));
-        }
-#endif
     };
 
     struct StringBtreeDefaultGreater {
@@ -430,19 +421,12 @@ namespace priv {
         StringBtreeDefaultGreater() = default;
 
         StringBtreeDefaultGreater(std::greater<std::string>) {}       // NOLINT
-#if PHMAP_HAVE_STD_STRING_VIEW
         StringBtreeDefaultGreater(std::greater<std::string_view>) {}  // NOLINT
 
         std::weak_ordering operator()(std::string_view lhs,
                                         std::string_view rhs) const {
             return compare_internal::compare_result_as_ordering(rhs.compare(lhs));
         }
-#else
-        std::weak_ordering operator()(std::string lhs,
-                                        std::string rhs) const {
-            return compare_internal::compare_result_as_ordering(rhs.compare(lhs));
-        }
-#endif
     };
 
     // A helper class to convert a boolean comparison into a three-way "compare-to"
@@ -477,7 +461,6 @@ namespace priv {
         using type = StringBtreeDefaultGreater;
     };
 
-#if PHMAP_HAVE_STD_STRING_VIEW
     template <>
     struct key_compare_to_adapter<std::less<std::string_view>> {
         using type = StringBtreeDefaultLess;
@@ -492,7 +475,6 @@ namespace priv {
     struct key_compare_to_adapter<std::greater<std::string_view>> {
         using type = StringBtreeDefaultGreater;
     };
-#endif
 
     template <typename Key, typename Compare, typename Alloc, int TargetNodeSize,
               bool Multi, typename SlotPolicy>

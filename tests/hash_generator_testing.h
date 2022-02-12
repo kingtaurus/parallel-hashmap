@@ -29,9 +29,7 @@
 #include <deque>
 #include <functional>
 
-#if PHMAP_HAVE_STD_STRING_VIEW
-    #include <string_view>
-#endif
+#include <string_view>
 
 #include "hash_policy_testing.h"
 
@@ -140,7 +138,6 @@ struct Generator<std::string> {
     }
 };
 
-#if PHMAP_HAVE_STD_STRING_VIEW
 template <>
 struct Generator<std::string_view> {
     std::string_view operator()() const {
@@ -155,7 +152,6 @@ struct Generator<std::string_view> {
         return res;
     }
 };
-#endif
 
 template <>
 struct Generator<NonStandardLayout> {
