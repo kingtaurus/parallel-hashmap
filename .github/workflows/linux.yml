@@ -17,6 +17,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2.0.0
+    - name: Install g++
+      run: sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test && sudo apt install -y g++-11
     - name: Build and test
       env:
         CXX: ${{ matrix.compiler }}
