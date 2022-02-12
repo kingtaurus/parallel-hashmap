@@ -346,6 +346,7 @@ namespace phmap {
         // Helper functions to do a boolean comparison of two keys given a boolean
         // or three-way comparator.
         // SFINAE prevents implicit conversions to bool (such as from int).
+        // ----------------------------------------------------------------------
         template <typename BoolType, std::enable_if_t<std::is_same_v<bool, BoolType>, int> = 0>
         constexpr bool compare_result_as_less_than(const BoolType r) { return r; }
 
@@ -361,6 +362,7 @@ namespace phmap {
         // Helper functions to do a three-way comparison of two keys given a boolean or
         // three-way comparator.
         // SFINAE prevents implicit conversions to int (such as from bool).
+        // ---------------------------------------------------------------------------
         template <typename Int, std::enable_if_t<std::is_same_v<int, Int>, int> = 0>
         constexpr std::weak_ordering compare_result_as_ordering(const Int c) {
             return c < 0 ? std::weak_ordering::less
@@ -392,7 +394,8 @@ namespace phmap {
 namespace priv {
 
     // A helper class that indicates if the Compare parameter is a key-compare-to
-    // comparator.
+    // comparator. 
+    // --------------------------------------------------------------------------
     template <typename Compare, typename T>
     using btree_is_key_compare_to =
         std::is_convertible<std::invoke_result_t<Compare, const T &, const T &>,
@@ -453,6 +456,7 @@ namespace priv {
     // google string types with common comparison functors.
     // These string-like specializations also turn on heterogeneous lookup by
     // default.
+    // ---------------------------------------------------------------------------
     template <typename Compare>
     struct key_compare_to_adapter {
         using type = Compare;
@@ -495,9 +499,12 @@ namespace priv {
     struct common_params {
         // If Compare is a common comparator for a std::string-like type, then we adapt it
         // to use heterogeneous lookup and to be a key-compare-to comparator.
+        // -------------------------------------------------------------------------------
         using key_compare = typename key_compare_to_adapter<Compare>::type;
+
         // A type which indicates if we have a key-compare-to functor or a plain old
         // key-compare functor.
+        // -------------------------------------------------------------------------
         using is_key_compare_to = btree_is_key_compare_to<key_compare, Key>;
 
         using allocator_type = Alloc;
@@ -529,6 +536,7 @@ namespace priv {
 
         // This is an integral type large enough to hold as many
         // ValueSize-values as will fit a node of TargetNodeSize bytes.
+        // ------------------------------------------------------------
         using node_count_type =
             std::conditional_t<(kNodeValueSpace / sizeof(value_type) >
                                 (std::numeric_limits<uint8_t>::max)()),
@@ -570,6 +578,7 @@ namespace priv {
 
     // A parameters structure for holding the type parameters for a btree_map.
     // Compare and Alloc should be nothrow copy-constructible.
+    // -----------------------------------------------------------------------
     template <typename Key, typename Data, typename Compare, typename Alloc,
               int TargetNodeSize, bool Multi>
     struct map_params : common_params<Key, Compare, Alloc, TargetNodeSize, Multi,
@@ -578,6 +587,7 @@ namespace priv {
         using mapped_type = Data;
         // This type allows us to move keys when it is safe to do so. It is safe
         // for maps in which value_type and mutable_value_type are layout compatible.
+        // --------------------------------------------------------------------------
         using slot_policy = typename super_type::slot_policy;
         using slot_type = typename super_type::slot_type;
         using value_type = typename super_type::value_type;
@@ -605,6 +615,7 @@ namespace priv {
 
     // This type implements the necessary functions from the
     // btree::priv::slot_type interface.
+    // -----------------------------------------------------
     template <typename Key>
     struct set_slot_policy {
         using slot_type = Key;
@@ -651,6 +662,7 @@ namespace priv {
 
     // A parameters structure for holding the type parameters for a btree_set.
     // Compare and Alloc should be nothrow copy-constructible.
+    // ------------------------------------------------------------------------
     template <typename Key, typename Compare, typename Alloc, int TargetNodeSize,
               bool Multi>
     struct set_params : common_params<Key, Compare, Alloc, TargetNodeSize, Multi,
@@ -668,6 +680,7 @@ namespace priv {
     // compare. Note: there is no need to make a version of this adapter specialized
     // for key-compare-to functors because the upper-bound (the first value greater
     // than the input) is never an exact match.
+    // -----------------------------------------------------------------------------
     template <typename Compare>
     struct upper_bound_adapter {
         explicit upper_bound_adapter(const Compare &c) : comp(c) {}
@@ -695,6 +708,7 @@ namespace priv {
     // When we don't use CompareTo, `match` is not present.
     // This ensures that callers can't use it accidentally when it provides no
     // useful information.
+    // -----------------------------------------------------------------------
     template <typename V>
     struct SearchResult<V, false> {
         V value;
@@ -706,6 +720,7 @@ namespace priv {
     // A node in the btree holding. The same node type is used for both internal
     // and leaf nodes in the btree, though the nodes are allocated in such a way
     // that the children array is only valid in internal nodes.
+    // -------------------------------------------------------------------------
     template <typename Params>
     class btree_node {
         using is_key_compare_to = typename Params::is_key_compare_to;
@@ -730,6 +745,7 @@ namespace priv {
         //   - If the key is arithmetic and the comparator is std::less or
         //     std::greater, choose linear.
         //   - Otherwise, choose binary.
+        // ---------------------------------------------------------------
         // TODO(ezb): Might make sense to add condition(s) based on node-size.
         using use_linear_search = std::integral_constant<
             bool,
@@ -744,6 +760,7 @@ namespace priv {
         btree_node &operator=(btree_node const &) = delete;
 
         // Public for EmptyNodeType.
+        // -------------------------
         constexpr static size_type Alignment() {
             static_assert(LeafLayout(1).Alignment() == InternalLayout().Alignment(),
                           "Alignment of all nodes must be equal.");
@@ -763,13 +780,16 @@ namespace priv {
                                           /*children*/ 0)
                 .AllocSize();
         }
+
         // A lower bound for the overhead of fields other than values in a leaf node.
+        // --------------------------------------------------------------------------
         constexpr static size_type MinimumOverhead() {
             return (size_type)(SizeWithNValues(1) - sizeof(value_type));
         }
 
         // Compute how many values we can fit onto a leaf node taking into account
         // padding.
+        // -----------------------------------------------------------------------
         constexpr static size_type NodeTargetValues(const int begin, const int end) {
             return begin == end ? begin
                 : SizeWithNValues((begin + end) / 2 + 1) >
@@ -785,14 +805,17 @@ namespace priv {
             // We need a minimum of 3 values per internal node in order to perform
             // splitting (1 value for the two nodes involved in the split and 1 value
             // propagated to the parent as the delimiter for the split).
+            // ----------------------------------------------------------------------
             kNodeValues = kNodeTargetValues >= 3 ? kNodeTargetValues : 3,
 
             // The node is internal (i.e. is not a leaf node) if and only if `max_count`
             // has this value.
+            // -------------------------------------------------------------------------
             kInternalNodeMaxCount = 0,
         };
 
         // Leaves can have less than kNodeValues values.
+        // ---------------------------------------------
         constexpr static layout_type LeafLayout(const int max_values = kNodeValues) {
             return layout_type(/*parent*/ 1,
                                /*position, start, count, max_count*/ 4,
@@ -814,6 +837,7 @@ namespace priv {
 
         // N is the index of the type in the Layout definition.
         // ElementType<N> is the Nth type in the Layout definition.
+        // --------------------------------------------------------
         template <size_type N>
         inline typename layout_type::template ElementType<N> *GetField() {
             // We assert that we don't read from values that aren't there.
@@ -840,30 +864,36 @@ namespace priv {
     public:
         // Whether this is a leaf node or not. This value doesn't change after the
         // node is created.
+        // -----------------------------------------------------------------------
         bool leaf() const { return GetField<1>()[3] != kInternalNodeMaxCount; }
 
         // Getter for the position of this node in its parent.
+        // ---------------------------------------------------
         field_type position() const { return GetField<1>()[0]; }
 
         // Getter for the offset of the first value in the `values` array.
+        // ---------------------------------------------------------------
         field_type start() const { return GetField<1>()[1]; }
 
         // Getters for the number of values stored in this node.
+        // -----------------------------------------------------
         field_type count() const { return GetField<1>()[2]; }
         field_type max_count() const {
             // Internal nodes have max_count==kInternalNodeMaxCount.
             // Leaf nodes have max_count in [1, kNodeValues].
+            // -----------------------------------------------------
             const field_type max_cnt = GetField<1>()[3];
-            return max_cnt == field_type{kInternalNodeMaxCount}
-            ? field_type{kNodeValues}
-            : max_cnt;
+            return max_cnt == field_type{kInternalNodeMaxCount} ? field_type{kNodeValues} : max_cnt;
         }
 
         // Getter for the parent of this node.
+        // -----------------------------------
         btree_node *parent() const { return *GetField<0>(); }
+
         // Getter for whether the node is the root of the tree. The parent of the
         // root of the tree is the leftmost node in the tree which is guaranteed to
         // be a leaf.
+        // ------------------------------------------------------------------------
         bool is_root() const { return parent()->leaf(); }
         void make_root() {
             assert(parent()->is_root());
@@ -871,11 +901,13 @@ namespace priv {
         }
 
         // Getters for the key/value at position i in the node.
+        // ----------------------------------------------------
         const key_type &key(size_type i) const { return params_type::key(slot(i)); }
         reference value(size_type i) { return params_type::element(slot(i)); }
         const_reference value(size_type i) const { return params_type::element(slot(i)); }
 
         // Getters/setter for the child at position i in the node.
+        // -------------------------------------------------------
         btree_node *child(size_type i) const { return GetField<3>()[i]; }
         btree_node *&mutable_child(size_type i) { return GetField<3>()[i]; }
         void clear_child(size_type i) {
@@ -892,6 +924,7 @@ namespace priv {
         }
 
         // Returns the position of the first value whose key is not less than k.
+        // ----------------------------------------------------------------------
         template <typename K>
         SearchResult<int, is_key_compare_to::value> lower_bound(
             const K &k, const key_compare &comp) const {
@@ -899,6 +932,7 @@ namespace priv {
                 : binary_search(k, comp);
         }
         // Returns the position of the first value whose key is greater than k.
+        // --------------------------------------------------------------------
         template <typename K>
         int upper_bound(const K &k, const key_compare &comp) const {
             auto upper_compare = upper_bound_adapter<key_compare>(comp);
@@ -922,6 +956,7 @@ namespace priv {
 
         // Returns the position of the first value whose key is not less than k using
         // linear search performed using plain compare.
+        // --------------------------------------------------------------------------
         template <typename K, typename Compare>
         SearchResult<int, false> linear_search_impl(
             const K &k, int s, const int e, const Compare &comp,
@@ -937,6 +972,7 @@ namespace priv {
 
         // Returns the position of the first value whose key is not less than k using
         // linear search performed using compare-to.
+        // --------------------------------------------------------------------------
         template <typename K, typename Compare>
         SearchResult<int, true> linear_search_impl(
             const K &k, int s, const int e, const Compare &comp,
@@ -955,6 +991,7 @@ namespace priv {
 
         // Returns the position of the first value whose key is not less than k using
         // binary search performed using plain compare.
+        // --------------------------------------------------------------------------
         template <typename K, typename Compare>
         SearchResult<int, false> binary_search_impl(
             const K &k, int s, int e, const Compare &comp,
@@ -972,6 +1009,7 @@ namespace priv {
 
         // Returns the position of the first value whose key is not less than k using
         // binary search performed using compare-to.
+        // --------------------------------------------------------------------------
         template <typename K, typename CompareTo>
         SearchResult<int, true> binary_search_impl(
             const K &k, int s, int e, const CompareTo &comp,
@@ -989,6 +1027,7 @@ namespace priv {
                             // Need to return the first value whose key is not less than k,
                             // which requires continuing the binary search if this is a
                             // multi-container.
+                            // ------------------------------------------------------------
                             exact_match = MatchKind::kEq;
                         }
                     }
@@ -1012,37 +1051,44 @@ namespace priv {
 
         // Emplaces a value at position i, shifting all existing values and
         // children at positions >= i to the right by 1.
+        // ----------------------------------------------------------------
         template <typename... Args>
         void emplace_value(size_type i, allocator_type *alloc, Args &&... args);
 
         // Removes the value at position i, shifting all existing values and children
         // at positions > i to the left by 1.
+        // --------------------------------------------------------------------------
         void remove_value(int i, allocator_type *alloc);
 
         // Removes the values at positions [i, i + to_erase), shifting all values
         // after that range to the left by to_erase. Does not change children at all.
+        // --------------------------------------------------------------------------
         void remove_values_ignore_children(int i, size_type to_erase,
                                            allocator_type *alloc);
 
         // Rebalances a node with its right sibling.
+        // -----------------------------------------
         void rebalance_right_to_left(int to_move, btree_node *right,
                                      allocator_type *alloc);
         void rebalance_left_to_right(int to_move, btree_node *right,
                                      allocator_type *alloc);
 
         // Splits a node, moving a portion of the node's values to its right sibling.
+        // --------------------------------------------------------------------------
         void split(int insert_position, btree_node *dest, allocator_type *alloc);
 
         // Merges a node with its right sibling, moving all of the values and the
         // delimiting key in the parent node onto itself.
+        // ----------------------------------------------------------------------
         void merge(btree_node *sibling, allocator_type *alloc);
 
         // Swap the contents of "this" and "src".
+        // --------------------------------------
         void swap(btree_node *src, allocator_type *alloc);
 
         // Node allocation/deletion routines.
-        static btree_node *init_leaf(btree_node *n, btree_node *parent,
-                                     int max_cnt) {
+        // ----------------------------------
+        static btree_node *init_leaf(btree_node *n, btree_node *parent, int max_cnt) {
             n->set_parent(parent);
             n->set_position(0);
             n->set_start(0);
@@ -1052,6 +1098,7 @@ namespace priv {
                 n->slot(0), max_cnt * sizeof(slot_type));
             return n;
         }
+
         static btree_node *init_internal(btree_node *n, btree_node *parent) {
             init_leaf(n, parent, kNodeValues);
             // Set `max_count` to a sentinel value to indicate that this node is
@@ -1061,6 +1108,7 @@ namespace priv {
                 &n->mutable_child(0), (kNodeValues + 1) * sizeof(btree_node *));
             return n;
         }
+
         void destroy(allocator_type *alloc) {
             for (int i = 0; i < count(); ++i) {
                 value_destroy(i, alloc);
@@ -1069,6 +1117,7 @@ namespace priv {
 
     public:
         // Exposed only for tests.
+        // -----------------------
         static bool testonly_uses_linear_node_search() {
             return use_linear_search::value;
         }
@@ -1086,6 +1135,7 @@ namespace priv {
 
         // Move n values starting at value i in this node into the values starting at
         // value j in node x.
+        // --------------------------------------------------------------------------
         void uninitialized_move_n(const size_type n, const size_type i,
                                   const size_type j, btree_node *x,
                                   allocator_type *alloc) {
@@ -1098,6 +1148,7 @@ namespace priv {
         }
 
         // Destroys a range of n values, starting at index i.
+        // --------------------------------------------------
         void value_destroy_n(const size_type i, const size_type n,
                              allocator_type *alloc) {
             for (size_type j = 0; j < n; ++j) {
@@ -1135,6 +1186,7 @@ namespace priv {
 
     public:
         // These aliases are public for std::iterator_traits.
+        // --------------------------------------------------
         using difference_type = typename Node::difference_type;
         using value_type = typename params_type::value_type;
         using pointer = Pointer;
@@ -1148,6 +1200,7 @@ namespace priv {
         // const_iterator, but it specifically avoids defining copy constructors so
         // that btree_iterator can be trivially copyable. This is for performance and
         // binary size reasons.
+        // --------------------------------------------------------------------------
         template <typename N, typename R, typename P,
                   std::enable_if_t<
                       std::is_same_v<btree_iterator<N, R, P>, iterator> &&
@@ -1161,6 +1214,7 @@ namespace priv {
         // iterator, but also avoids defining a copy constructor.
         // NOTE: the const_cast is safe because this constructor is only called by
         // non-const methods and the container owns the nodes.
+        // -----------------------------------------------------------------------
         template <typename N, typename R, typename P,
                   std::enable_if_t<
                       std::is_same_v<btree_iterator<N, R, P>, const_iterator> &&
@@ -1170,6 +1224,7 @@ namespace priv {
             : node(const_cast<node_type *>(x.node)), position(x.position) {}
 
         // Increment/decrement the iterator.
+        // ---------------------------------
         void increment() {
             if (node->leaf() && ++position < node->count()) {
                 return;
@@ -1195,6 +1250,7 @@ namespace priv {
         }
 
         // Accessors for the key/value the iterator is pointing at.
+        // --------------------------------------------------------
         reference operator*() const {
             return node->value(position);
         }
@@ -1241,9 +1297,12 @@ namespace priv {
         slot_type *slot() { return node->slot(position); }
 
         // The node in the tree the iterator is pointing at.
+        // -------------------------------------------------
         Node *node;
+
         // The position within the node of the tree the iterator is pointing at.
         // TODO(ezb): make this a field_type
+        // ----------------------------------------------------------------------
         int position;
     };
 
@@ -1254,6 +1313,7 @@ namespace priv {
 
         // We use a static empty node for the root/leftmost/rightmost of empty btrees
         // in order to avoid branching in begin()/end().
+        // --------------------------------------------------------------------------
         struct alignas(node_type::Alignment()) EmptyNodeType : node_type {
             using field_type = typename node_type::field_type;
             node_type *parent;
@@ -1327,11 +1387,13 @@ namespace priv {
         using node_handle_type = node_handle<Params, Params, allocator_type>;
 
         // Internal types made public for use by btree_container types.
+        // ------------------------------------------------------------
         using params_type = Params;
         using slot_type = typename Params::slot_type;
 
     private:
         // For use in copy_or_move_values_in_order.
+        // ----------------------------------------
         const value_type &maybe_move_from_iterator(const_iterator x) { return *x; }
         value_type &&maybe_move_from_iterator(iterator x) { return std::move(*x); }
 
@@ -1339,10 +1401,12 @@ namespace priv {
         // x into this btree in their order in x. This btree must be empty before this
         // method is called. This method is used in copy construction, copy
         // assignment, and move assignment.
+        // --------------------------------------------------------------------------
         template <typename Btree>
         void copy_or_move_values_in_order(Btree *x);
 
         // Validates that various assumptions/requirements are true at compile time.
+        // -------------------------------------------------------------------------
         constexpr static bool static_assert_validation();
 
     public:
@@ -1359,11 +1423,13 @@ namespace priv {
         ~btree() {
             // Put static_asserts in destructor to avoid triggering them before the type
             // is complete.
+            // -------------------------------------------------------------------------
             static_assert(static_assert_validation(), "This call must be elided.");
             clear();
         }
 
         // Assign the contents of x to *this.
+        // ----------------------------------
         btree &operator=(const btree &x);
         btree &operator=(btree &&x) noexcept;
 
@@ -1391,6 +1457,7 @@ namespace priv {
         }
 
         // Finds the first element whose key is not less than key.
+        // -------------------------------------------------------
         template <typename K>
         iterator lower_bound(const K &key) {
             return internal_end(internal_lower_bound(key));
@@ -1401,6 +1468,7 @@ namespace priv {
         }
 
         // Finds the first element whose key is greater than key.
+        // ------------------------------------------------------
         template <typename K>
         iterator upper_bound(const K &key) {
             return internal_end(internal_upper_bound(key));
@@ -1413,6 +1481,7 @@ namespace priv {
         // Finds the range of values which compare equal to key. The first member of
         // the returned pair is equal to lower_bound(key). The second member pair of
         // the pair is equal to upper_bound(key).
+        // -------------------------------------------------------------------------
         template <typename K>
         std::pair<iterator, iterator> equal_range(const K &key) {
             return {lower_bound(key), upper_bound(key)};
@@ -1426,6 +1495,7 @@ namespace priv {
         // boolean return value indicates whether insertion succeeded or failed.
         // Requirement: if `key` already exists in the btree, does not consume `args`.
         // Requirement: `key` is never referenced after consuming `args`.
+        // ---------------------------------------------------------------------------
         template <typename... Args>
         std::pair<iterator, bool> insert_unique(const key_type &key, Args &&... args);
 
@@ -1435,20 +1505,24 @@ namespace priv {
         // logarithmic time as if a call to insert_unique() were made.
         // Requirement: if `key` already exists in the btree, does not consume `args`.
         // Requirement: `key` is never referenced after consuming `args`.
+        // ---------------------------------------------------------------------------
         template <typename... Args>
         std::pair<iterator, bool> insert_hint_unique(iterator position,
                                                      const key_type &key,
                                                      Args &&... args);
 
         // Insert a range of values into the btree.
+        // ----------------------------------------
         template <typename InputIterator>
         void insert_iterator_unique(InputIterator b, InputIterator e);
 
         // Inserts a value into the btree.
+        // -------------------------------
         template <typename ValueType>
         iterator insert_multi(const key_type &key, ValueType &&v);
 
         // Inserts a value into the btree.
+        // -------------------------------
         template <typename ValueType>
         iterator insert_multi(ValueType &&v) {
             return insert_multi(params_type::key(v), std::forward<ValueType>(v));
@@ -1458,10 +1532,12 @@ namespace priv {
         // before position in the tree. If it does, then the insertion will take
         // amortized constant time. If not, the insertion will take amortized
         // logarithmic time as if a call to insert_multi(v) were made.
+        // ------------------------------------------------------------------------
         template <typename ValueType>
         iterator insert_hint_multi(iterator position, ValueType &&v);
 
         // Insert a range of values into the btree.
+        // ----------------------------------------
         template <typename InputIterator>
         void insert_iterator_multi(InputIterator b, InputIterator e);
 
@@ -1469,24 +1545,29 @@ namespace priv {
         // (i.e. not equal to end()).  Return an iterator pointing to the node after
         // the one that was erased (or end() if none exists).
         // Requirement: does not read the value at `*iter`.
+        // ------------------------------------------------------------------------
         iterator erase(iterator iter);
 
         // Erases range. Returns the number of keys erased and an iterator pointing
         // to the element after the last erased element.
+        // ------------------------------------------------------------------------
         std::pair<size_type, iterator> erase(iterator begin, iterator end);
 
         // Erases the specified key from the btree. Returns 1 if an element was
         // erased and 0 otherwise.
+        // --------------------------------------------------------------------
         template <typename K>
         size_type erase_unique(const K &key);
 
         // Erases all of the entries matching the specified key from the
         // btree. Returns the number of elements erased.
+        // -------------------------------------------------------------
         template <typename K>
         size_type erase_multi(const K &key);
 
         // Finds the iterator corresponding to a key or returns end() if the key is
         // not present.
+        // ------------------------------------------------------------------------
         template <typename K>
         iterator find(const K &key) {
             return internal_end(internal_find(key));
@@ -1497,6 +1578,7 @@ namespace priv {
         }
 
         // Returns a count of the number of times the key appears in the btree.
+        // --------------------------------------------------------------------
         template <typename K>
         size_type count_unique(const K &key) const {
             const iterator beg = internal_find(key);
@@ -1506,7 +1588,9 @@ namespace priv {
             }
             return 1;
         }
+
         // Returns a count of the number of times the key appears in the btree.
+        // --------------------------------------------------------------------
         template <typename K>
         size_type count_multi(const K &key) const {
             const auto range = equal_range(key);
@@ -1517,6 +1601,7 @@ namespace priv {
         void clear();
 
         // Swap the contents of *this and x.
+        // ---------------------------------
         void swap(btree &x);
 
         const key_compare &key_comp() const noexcept {
@@ -1530,14 +1615,17 @@ namespace priv {
         value_compare value_comp() const { return value_compare(key_comp()); }
 
         // Verifies the structure of the btree.
+        // ------------------------------------
         void verify() const;
 
         // Size routines.
+        // --------------
         size_type size() const { return size_; }
         size_type max_size() const { return (std::numeric_limits<size_type>::max)(); }
         bool empty() const { return size_ == 0; }
 
         // The height of the btree. An empty tree will have height 0.
+        // ----------------------------------------------------------
         size_type height() const {
             size_type h = 0;
             if (!empty()) {
@@ -1545,6 +1633,7 @@ namespace priv {
                 // root. We actually count from the root back around to the level below
                 // the root, but the calculation is the same because of the circularity
                 // of that traversal.
+                // ----------------------------------------------------------------------
                 const node_type *n = root();
                 do {
                     ++h;
@@ -1555,6 +1644,7 @@ namespace priv {
         }
 
         // The number of internal, leaf and total nodes used by the btree.
+        // ---------------------------------------------------------------
         size_type leaf_nodes() const {
             return internal_stats(root()).leaf_nodes;
         }
@@ -1567,6 +1657,7 @@ namespace priv {
         }
 
         // The total number of bytes used by the btree.
+        // --------------------------------------------
         size_type bytes_used() const {
             node_stats stats = internal_stats(root());
             if (stats.leaf_nodes == 1 && stats.internal_nodes == 0) {
@@ -1580,10 +1671,12 @@ namespace priv {
         }
 
         // The average number of bytes used per value stored in the btree.
+        // ---------------------------------------------------------------
         static double average_bytes_per_value() {
             // Returns the number of bytes per value on a leaf node that is 75%
             // full. Experimentally, this matches up nicely with the computed number of
             // bytes per value in trees that had their values inserted in random order.
+            // ------------------------------------------------------------------------
             return node_type::LeafSize() / (kNodeValues * 0.75);
         }
 
@@ -1592,14 +1685,17 @@ namespace priv {
         // of nodes could hold. A value of 1 indicates perfect space
         // utilization. Smaller values indicate space wastage.
         // Returns 0 for empty trees.
+        // --------------------------------------------------------------------------
         double fullness() const {
             if (empty()) return 0.0;
             return static_cast<double>(size()) / (nodes() * kNodeValues);
         }
+
         // The overhead of the btree structure in bytes per node. Computed as the
         // total number of bytes used by the btree minus the number of bytes used for
         // storing elements divided by the number of elements.
         // Returns 0 for empty trees.
+        // --------------------------------------------------------------------------
         double overhead() const {
             if (empty()) return 0.0;
             return (bytes_used() - size() * sizeof(value_type)) /
@@ -1607,22 +1703,26 @@ namespace priv {
         }
 
         // The allocator used by the btree.
+        // --------------------------------
         allocator_type get_allocator() const {
             return allocator();
         }
 
     private:
         // Internal accessor routines.
+        // ---------------------------
         node_type *root() { return root_.template get<2>(); }
         const node_type *root() const { return root_.template get<2>(); }
         node_type *&mutable_root() noexcept { return root_.template get<2>(); }
         key_compare *mutable_key_comp() noexcept { return &root_.template get<0>(); }
 
         // The leftmost node is stored as the parent of the root node.
+        // -----------------------------------------------------------
         node_type *leftmost() { return root()->parent(); }
         const node_type *leftmost() const { return root()->parent(); }
 
         // Allocator routines.
+        // -------------------
         allocator_type *mutable_allocator() noexcept {
             return &root_.template get<1>();
         }
@@ -1632,6 +1732,7 @@ namespace priv {
 
         // Allocates a correctly aligned node of at least size bytes using the
         // allocator.
+        // -------------------------------------------------------------------
         node_type *allocate(const size_type sz) {
             return reinterpret_cast<node_type *>(
                 Allocate<node_type::Alignment()>(
@@ -1639,6 +1740,7 @@ namespace priv {
         }
 
         // Node creation/deletion routines.
+        // --------------------------------
         node_type* new_internal_node(node_type *parent) {
             node_type *p = allocate(node_type::InternalSize());
             return node_type::init_internal(p, parent);
@@ -1653,11 +1755,13 @@ namespace priv {
         }
 
         // Deletion helper routines.
+        // -------------------------
         void erase_same_node(iterator begin, iterator end);
         iterator erase_from_leaf_node(iterator begin, size_type to_erase);
         iterator rebalance_after_delete(iterator iter);
 
         // Deallocates a node of a certain size in bytes using the allocator.
+        // ------------------------------------------------------------------
         void deallocate(const size_type sz, node_type *node) {
             Deallocate<node_type::Alignment()>(
                 mutable_allocator(), node, (size_t)sz);
@@ -1673,19 +1777,23 @@ namespace priv {
         }
 
         // Rebalances or splits the node iter points to.
+        // ---------------------------------------------
         void rebalance_or_split(iterator *iter);
 
         // Merges the values of left, right and the delimiting key on their parent
         // onto left, removing the delimiting key and deleting right.
+        // ----------------------------------------------------------
         void merge_nodes(node_type *left, node_type *right);
 
         // Tries to merge node with its left or right sibling, and failing that,
         // rebalance with its left or right sibling. Returns true if a merge
         // occurred, at which point it is no longer valid to access node. Returns
         // false if no merging took place.
+        // ----------------------------------------------------------------------
         bool try_merge_or_rebalance(iterator *iter);
 
         // Tries to shrink the height of the tree by 1.
+        // --------------------------------------------
         void try_shrink();
 
         iterator internal_end(iterator iter) {
@@ -1697,6 +1805,7 @@ namespace priv {
 
         // Emplaces a value into the btree immediately before iter. Requires that
         // key(v) <= iter.key() and (--iter).key() <= key(v).
+        // ----------------------------------------------------------------------
         template <typename... Args>
         iterator internal_emplace(iterator iter, Args &&... args);
 
@@ -1705,6 +1814,7 @@ namespace priv {
         // iter.position == iter.node->count(). This routine simply moves iter up in
         // the tree to a valid location.
         // Requires: iter.node is non-null.
+        // -------------------------------------------------------------------------
         template <typename IterType>
         static IterType internal_last(IterType iter);
 
@@ -1716,6 +1826,7 @@ namespace priv {
         // specialization allows the caller to avoid a subsequent comparison to
         // determine if an exact match was made, which is important for keys with
         // expensive comparison, such as strings.
+        // --------------------------------------------------------------------------
         template <typename K>
         SearchResult<iterator, is_key_compare_to::value> internal_locate(
             const K &key) const;
@@ -1728,27 +1839,33 @@ namespace priv {
         SearchResult<iterator, true> internal_locate_impl(
             const K &key, std::true_type /* IsCompareTo */) const;
 
-        // Internal routine which implements lower_bound().
+        // Internal routine which implements lower_bound()
+        // -----------------------------------------------.
         template <typename K>
         iterator internal_lower_bound(const K &key) const;
 
         // Internal routine which implements upper_bound().
+        // ------------------------------------------------
         template <typename K>
         iterator internal_upper_bound(const K &key) const;
 
-        // Internal routine which implements find().
+        // Internal routine which implements find()
+        // ----------------------------------------.
         template <typename K>
         iterator internal_find(const K &key) const;
 
         // Deletes a node and all of its children.
+        // ---------------------------------------
         void internal_clear(node_type *node);
 
         // Verifies the tree structure of node.
+        // ------------------------------------
         int internal_verify(const node_type *node,
                             const key_type *lo, const key_type *hi) const;
 
         node_stats internal_stats(const node_type *node) const {
             // The root can be a static empty node.
+            // ------------------------------------
             if (node == nullptr || (node == root() && empty())) {
                 return node_stats(0, 0);
             }
@@ -1764,6 +1881,7 @@ namespace priv {
 
     public:
         // Exposed only for tests.
+        // -----------------------
         static bool testonly_uses_linear_node_search() {
             return node_type::testonly_uses_linear_node_search();
         }
@@ -1771,19 +1889,23 @@ namespace priv {
     private:
         // We use compressed tuple in order to save space because key_compare and
         // allocator_type are usually empty.
+        // ----------------------------------------------------------------------
         phmap::priv::CompressedTuple<key_compare, allocator_type, node_type *>
         root_;
 
         // A pointer to the rightmost node. Note that the leftmost node is stored as
         // the root's parent.
+        // -------------------------------------------------------------------------
         node_type *rightmost_;
 
         // Number of values.
+        // -----------------
         size_type size_;
     };
 
     ////
     // btree_node methods
+    // ----------------------------------------------------------------------
     template <typename P>
     template <typename... Args>
     inline void btree_node<P>::emplace_value(const size_type i,
@@ -1792,6 +1914,7 @@ namespace priv {
         assert(i <= count());
         // Shift old values to create space for new value and then construct it in
         // place.
+        // -----------------------------------------------------------------------
         if (i < count()) {
             value_init(count(), alloc, slot(count() - 1));
             for (size_type j = count() - 1; j > i; --j)
@@ -1889,12 +2012,14 @@ namespace priv {
         // other (to_move - 1) values in the left node are moved into the right node.
         // Lastly, a new delimiting value is moved from the left node into the
         // parent, and the remaining empty left node entries are destroyed.
+        // -------------------------------------------------------------------------
 
         if (right->count() >= to_move) {
             // The original location of the right->count() values are sufficient to hold
             // the new to_move entries from the parent and left node.
 
             // 1) Shift existing values in the right node to their correct positions.
+            // ----------------------------------------------------------------------
             right->uninitialized_move_n(to_move, right->count() - to_move,
                                         right->count(), right, alloc);
             for (slot_type *src = right->slot(right->count() - to_move - 1),
@@ -1905,10 +2030,12 @@ namespace priv {
             }
 
             // 2) Move the delimiting value in the parent to the right node.
+            // ----------------------------------------------------------------------
             params_type::move(alloc, parent()->slot(position()),
                               right->slot(to_move - 1));
 
             // 3) Move the (to_move - 1) values from the left node to the right node.
+            // ----------------------------------------------------------------------
             params_type::move(alloc, slot(count() - (to_move - 1)), slot(count()),
                               right->slot(0));
         } else {
@@ -1916,12 +2043,15 @@ namespace priv {
             // to_move entries, so part of them will move to uninitialized space.
 
             // 1) Shift existing values in the right node to their correct positions.
+            // ----------------------------------------------------------------------
             right->uninitialized_move_n(right->count(), 0, to_move, right, alloc);
 
             // 2) Move the delimiting value in the parent to the right node.
+            // ----------------------------------------------------------------------
             right->value_init(to_move - 1, alloc, parent()->slot(position()));
 
             // 3) Move the (to_move - 1) values from the left node to the right node.
+            // ----------------------------------------------------------------------
             const size_type uninitialized_remaining = to_move - right->count() - 1;
             uninitialized_move_n(uninitialized_remaining,
                                  count() - uninitialized_remaining, right->count(),
@@ -1931,13 +2061,16 @@ namespace priv {
         }
 
         // 4) Move the new delimiting value to the parent from the left node.
+        // ------------------------------------------------------------------
         params_type::move(alloc, slot(count() - to_move), parent()->slot(position()));
 
         // 5) Destroy the now-empty to_move entries in the left node.
+        // ----------------------------------------------------------
         value_destroy_n(count() - to_move, to_move, alloc);
 
         if (!leaf()) {
             // Move the child pointers from the left to the right node.
+            // --------------------------------------------------------
             for (int i = right->count(); i >= 0; --i) {
                 right->init_child(i + to_move, right->child(i));
                 right->clear_child(i);
@@ -1949,6 +2082,7 @@ namespace priv {
         }
 
         // Fixup the counts on the left and right nodes.
+        // ---------------------------------------------
         set_count((field_type)(count() - to_move));
         right->set_count((field_type)(right->count() + to_move));
     }
@@ -1963,6 +2097,7 @@ namespace priv {
         // inserting at the beginning of the left node then bias the split to put
         // more values on the right node. If we're inserting at the end of the
         // right node then bias the split to put more values on the left node.
+        // ----------------------------------------------------------------------
         if (insert_position == 0) {
             dest->set_count((field_type)(count() - 1));
         } else if (insert_position == kNodeValues) {
@@ -1974,12 +2109,15 @@ namespace priv {
         assert(count() >= 1);
 
         // Move values from the left sibling to the right sibling.
+        // -------------------------------------------------------
         uninitialized_move_n(dest->count(), count(), 0, dest, alloc);
 
         // Destroy the now-empty entries in the left node.
+        // -----------------------------------------------
         value_destroy_n(count(), dest->count(), alloc);
 
         // The split key is the largest value in the left sibling.
+        // -------------------------------------------------------
         set_count((field_type)(count() - 1));
         parent()->emplace_value(position(), alloc, slot(count()));
         value_destroy(count(), alloc);
@@ -2000,16 +2138,20 @@ namespace priv {
         assert(position() + 1 == src->position());
 
         // Move the delimiting value to the left node.
+        // -------------------------------------------
         value_init(count(), alloc, parent()->slot(position()));
 
         // Move the values from the right to the left node.
+        // ------------------------------------------------
         src->uninitialized_move_n(src->count(), 0, count() + 1, this, alloc);
 
         // Destroy the now-empty entries in the right node.
+        // ------------------------------------------------
         src->value_destroy_n(0, src->count(), alloc);
 
         if (!leaf()) {
             // Move the child pointers from the right to the left node.
+            // --------------------------------------------------------
             for (int i = 0; i <= src->count(); ++i) {
                 init_child(count() + i + 1, src->child(i));
                 src->clear_child(i);
@@ -2017,10 +2159,12 @@ namespace priv {
         }
 
         // Fixup the counts on the src and dest nodes.
+        // -------------------------------------------
         set_count((field_type)(1 + count() + src->count()));
         src->set_count(0);
 
         // Remove the value on the parent node.
+        // ------------------------------------
         parent()->remove_value(position(), alloc);
     }
 
@@ -2030,12 +2174,14 @@ namespace priv {
         assert(leaf() == x->leaf());
 
         // Determine which is the smaller/larger node.
+        // -------------------------------------------
         btree_node *smaller = this, *larger = x;
         if (smaller->count() > larger->count()) {
             swap(smaller, larger);
         }
 
         // Swap the values.
+        // ----------------
         for (slot_type *a = smaller->slot(0), *b = larger->slot(0),
                  *end = a + smaller->count();
              a != end; ++a, ++b) {
@@ -2043,6 +2189,7 @@ namespace priv {
         }
 
         // Move values that can't be swapped.
+        // ----------------------------------
         const size_type to_move = larger->count() - smaller->count();
         larger->uninitialized_move_n(to_move, smaller->count(), smaller->count(),
                                      smaller, alloc);
@@ -2050,16 +2197,21 @@ namespace priv {
 
         if (!leaf()) {
             // Swap the child pointers.
+            // ------------------------
             std::swap_ranges(&smaller->mutable_child(0),
                              &smaller->mutable_child(smaller->count() + 1),
                              &larger->mutable_child(0));
+
             // Update swapped children's parent pointers.
+            // ------------------------------------------
             int i = 0;
             for (; i <= smaller->count(); ++i) {
                 smaller->child(i)->set_parent(smaller);
                 larger->child(i)->set_parent(larger);
             }
+
             // Move the child pointers that couldn't be swapped.
+            // -------------------------------------------------
             for (; i <= larger->count(); ++i) {
                 smaller->init_child(i, larger->child(i));
                 larger->clear_child(i);
@@ -2067,11 +2219,13 @@ namespace priv {
         }
 
         // Swap the counts.
+        // ----------------
         swap(mutable_count(), x->mutable_count());
     }
 
     ////
     // btree_iterator methods
+    // ----------------------------------------------------------------------
     template <typename N, typename R, typename P>
     void btree_iterator<N, R, P>::increment_slow() {
         if (node->leaf()) {
@@ -2120,6 +2274,7 @@ namespace priv {
 
     ////
     // btree methods
+    // ----------------------------------------------------------------------
     template <typename P>
     template <typename Btree>
     void btree<P>::copy_or_move_values_in_order(Btree *x) {
@@ -2130,6 +2285,7 @@ namespace priv {
 
         // We can avoid key comparisons because we know the order of the
         // values is the same order we'll store them in.
+        // -------------------------------------------------------------
         auto iter = x->begin();
         if (iter == x->end()) return;
         insert_multi(maybe_move_from_iterator(iter));
@@ -2137,6 +2293,7 @@ namespace priv {
         for (; iter != x->end(); ++iter) {
             // If the btree is not empty, we can just insert the new value at the end
             // of the tree.
+            // ----------------------------------------------------------------------
             internal_emplace(end(), maybe_move_from_iterator(iter));
         }
     }
@@ -2147,25 +2304,27 @@ namespace priv {
                       "Key comparison must be nothrow copy constructible");
         static_assert(std::is_nothrow_copy_constructible_v<allocator_type>,
                       "Allocator must be nothrow copy constructible");
-        static_assert(type_traits_internal::is_trivially_copyable<iterator>::value,
+        static_assert(std::is_trivially_copyable<iterator>::value,
                       "iterator not trivially copyable.");
 
         // Note: We assert that kTargetValues, which is computed from
         // Params::kTargetNodeSize, must fit the node_type::field_type.
+        // ------------------------------------------------------------
         static_assert(
             kNodeValues < (1 << (8 * sizeof(typename node_type::field_type))),
             "target node size too large");
 
         // Verify that key_compare returns an std::{weak,strong}_ordering or bool.
+        // -----------------------------------------------------------------------
         using compare_result_type =
             std::invoke_result_t<key_compare, key_type, key_type>;
         static_assert(
             std::is_same_v<compare_result_type, bool> ||
             std::is_convertible_v<compare_result_type, std::weak_ordering>,
-            "key comparison function must return std::{weak,strong}_ordering or "
-            "bool.");
+            "key comparison function must return std::{weak,strong}_ordering or bool.");
 
         // Test the assumption made in setting kNodeValueSpace.
+        // ----------------------------------------------------
         static_assert(node_type::MinimumOverhead() >= sizeof(void *) + 4,
                       "node space assumption incorrect");
 
@@ -2195,6 +2354,7 @@ namespace priv {
         if (res.HasMatch()) {
             if (res.IsEq()) {
                 // The key already exists in the tree, do nothing.
+                // -----------------------------------------------
                 return {iter, false};
             }
         } else {
@@ -2217,16 +2377,19 @@ namespace priv {
                 iterator prev = position;
                 if (position == begin() || compare_keys((--prev).key(), key)) {
                     // prev.key() < key < position.key()
+                    // ---------------------------------
                     return {internal_emplace(position, std::forward<Args>(args)...), true};
                 }
             } else if (compare_keys(position.key(), key)) {
                 ++position;
                 if (position == end() || compare_keys(key, position.key())) {
                     // {original `position`}.key() < key < {current `position`}.key()
+                    // --------------------------------------------------------------
                     return {internal_emplace(position, std::forward<Args>(args)...), true};
                 }
             } else {
                 // position.key() == key
+                // ---------------------
                 return {position, false};
             }
         }
@@ -2264,6 +2427,7 @@ namespace priv {
                 iterator prev = position;
                 if (position == begin() || !compare_keys(key, (--prev).key())) {
                     // prev.key() <= key <= position.key()
+                    // -----------------------------------
                     return internal_emplace(position, std::forward<ValueType>(v));
                 }
             } else {
@@ -2271,6 +2435,7 @@ namespace priv {
                 ++next;
                 if (next == end() || !compare_keys(next.key(), key)) {
                     // position.key() < key <= next.key()
+                    // ----------------------------------
                     return internal_emplace(next, std::forward<ValueType>(v));
                 }
             }
@@ -2325,6 +2490,7 @@ namespace priv {
                     // different so we can't take over its memory. We must move each element
                     // individually. We need both `x` and `this` to have `x`s key comparator
                     // while moving the values so we can't swap the key comparators.
+                    // ----------------------------------------------------------------------
                     *mutable_key_comp() = x.key_comp();
                     copy_or_move_values_in_order(&x);
                 }
@@ -2341,6 +2507,7 @@ namespace priv {
             // from our left child here, then delete that position (in remove_value()
             // below). We can get to the largest value from our left child by
             // decrementing iter.
+            // ----------------------------------------------------------------------
             iterator internal_iter(iter);
             --iter;
             assert(iter.node->leaf());
@@ -2359,6 +2526,7 @@ namespace priv {
         // false) then the next value is ++iter. Note that ++iter may point to an
         // internal node and the value in the internal node may move to a leaf node
         // (iter.node) when rebalancing is performed at the leaf level.
+        // ----------------------------------------------------------------------
 
         iterator res = rebalance_after_delete(iter);
 
@@ -2388,6 +2556,7 @@ namespace priv {
             bool merged = try_merge_or_rebalance(&iter);
             // On the first iteration, we should update `res` with `iter` because `res`
             // may have been invalidated.
+            // ------------------------------------------------------------------------
             if (first_iteration) {
                 res = iter;
                 first_iteration = false;
@@ -2401,6 +2570,7 @@ namespace priv {
 
         // Adjust our return value. If we're pointing at the end of a node, advance
         // the iterator.
+        // ------------------------------------------------------------------------
         if (res.position == res.node->count()) {
             res.position = res.node->count() - 1;
             ++res;
@@ -2465,11 +2635,13 @@ namespace priv {
         node->remove_values_ignore_children(_begin.position, to_erase,
                                             mutable_allocator());
 
+        // ---------------------------------------------------------------------------
         // Do not need to update rightmost_, because
         // * either _end == this->end(), and therefore node == rightmost_, and still
         //   exists
         // * or _end != this->end(), and therefore rightmost_ hasn't been erased, since
         //   it wasn't covered in [_begin, _end)
+        // ----------------------------------------------------------------------------
     }
 
     template <typename P>
@@ -2494,6 +2666,7 @@ namespace priv {
         const iterator iter = internal_find(key);
         if (iter.node == nullptr) {
             // The key doesn't exist in the tree, return nothing done.
+            // -------------------------------------------------------
             return 0;
         }
         erase(iter);
@@ -2506,9 +2679,11 @@ namespace priv {
         const iterator _begin = internal_lower_bound(key);
         if (_begin.node == nullptr) {
             // The key doesn't exist in the tree, return nothing done.
+            // -------------------------------------------------------
             return 0;
         }
         // Delete all of the keys between _begin and upper_bound(key).
+        // -----------------------------------------------------------
         const iterator _end = internal_end(internal_upper_bound(key));
         return erase(_begin, _end).first;
     }
@@ -2560,16 +2735,19 @@ namespace priv {
         assert(kNodeValues == node->max_count());
 
         // First try to make room on the node by rebalancing.
+        // --------------------------------------------------
         node_type *parent = node->parent();
         if (node != root()) {
             if (node->position() > 0) {
                 // Try rebalancing with our left sibling.
+                // --------------------------------------
                 node_type *left = parent->child(node->position() - 1);
                 assert(left->max_count() == kNodeValues);
                 if (left->count() < kNodeValues) {
                     // We bias rebalancing based on the position being inserted. If we're
                     // inserting at the end of the right node then we bias rebalancing to
                     // fill up the left node.
+                    // ------------------------------------------------------------------
                     int to_move = (kNodeValues - left->count()) /
                         (1 + (insert_position < kNodeValues));
                     to_move = (std::max)(1, to_move);
@@ -2593,12 +2771,14 @@ namespace priv {
 
             if (node->position() < parent->count()) {
                 // Try rebalancing with our right sibling.
+                // ---------------------------------------
                 node_type *right = parent->child(node->position() + 1);
                 assert(right->max_count() == kNodeValues);
                 if (right->count() < kNodeValues) {
                     // We bias rebalancing based on the position being inserted. If we're
                     // inserting at the _beginning of the left node then we bias rebalancing
                     // to fill up the right node.
+                    // ---------------------------------------------------------------------
                     int to_move =
                         (kNodeValues - right->count()) / (1 + (insert_position > 0));
                     to_move = (std::max)(1, to_move);
@@ -2620,6 +2800,7 @@ namespace priv {
 
             // Rebalancing failed, make sure there is room on the parent node for a new
             // value.
+            // ------------------------------------------------------------------------
             assert(parent->max_count() == kNodeValues);
             if (parent->count() == kNodeValues) {
                 iterator parent_iter(node->parent(), node->position());
@@ -2629,14 +2810,17 @@ namespace priv {
             // Rebalancing not possible because this is the root node.
             // Create a new root node and set the current root node as the child of the
             // new root.
+            // ------------------------------------------------------------------------
             parent = new_internal_node(parent);
             parent->init_child(0, root());
             mutable_root() = parent;
             // If the former root was a leaf node, then it's now the rightmost node.
+            // ---------------------------------------------------------------------
             assert(!parent->child(0)->leaf() || parent->child(0) == rightmost_);
         }
 
         // Split the node.
+        // ---------------
         node_type *split_node;
         if (node->leaf()) {
             split_node = new_leaf_node(parent);
@@ -2669,6 +2853,7 @@ namespace priv {
         node_type *parent = iter->node->parent();
         if (iter->node->position() > 0) {
             // Try merging with our left sibling.
+            // ----------------------------------
             node_type *left = parent->child(iter->node->position() - 1);
             assert(left->max_count() == kNodeValues);
             if ((1 + left->count() + iter->node->count()) <= kNodeValues) {
@@ -2680,6 +2865,7 @@ namespace priv {
         }
         if (iter->node->position() < parent->count()) {
             // Try merging with our right sibling.
+            // -----------------------------------
             node_type *right = parent->child(iter->node->position() + 1);
             assert(right->max_count() == kNodeValues);
             if ((1 + iter->node->count() + right->count()) <= kNodeValues) {
@@ -2690,6 +2876,7 @@ namespace priv {
             // we deleted the first element from iter->node and the node is not
             // empty. This is a small optimization for the common pattern of deleting
             // from the front of the tree.
+            // -----------------------------------------------------------------------
             if ((right->count() > kMinNodeValues) &&
                 ((iter->node->count() == 0) ||
                  (iter->position > 0))) {
@@ -2704,6 +2891,7 @@ namespace priv {
             // we deleted the last element from iter->node and the node is not
             // empty. This is a small optimization for the common pattern of deleting
             // from the back of the tree.
+            // ----------------------------------------------------------------------
             node_type *left = parent->child(iter->node->position() - 1);
             if ((left->count() > kMinNodeValues) &&
                 ((iter->node->count() == 0) ||
@@ -2724,6 +2912,7 @@ namespace priv {
             return;
         }
         // Deleted the last item on the root node, shrink the height of the tree.
+        // ----------------------------------------------------------------------
         if (root()->leaf()) {
             assert(size() == 0);
             delete_leaf_node(root());
@@ -2759,6 +2948,7 @@ namespace priv {
         if (!iter.node->leaf()) {
             // We can't insert on an internal node. Instead, we'll insert after the
             // previous value which is guaranteed to be on a leaf node.
+            // --------------------------------------------------------------------
             --iter;
             ++iter.position;
         }
@@ -2768,6 +2958,7 @@ namespace priv {
             if (max_count < kNodeValues) {
                 // Insertion into the root where the root is smaller than the full node
                 // size. Simply grow the size of the root node.
+                // --------------------------------------------------------------------
                 assert(iter.node == root());
                 iter.node =
                     new_leaf_root_node((std::min<int>)(kNodeValues, 2 * max_count));
@@ -2804,6 +2995,7 @@ namespace priv {
             // equal, but determining equality would require doing an extra comparison
             // on each node on the way down, and we will need to go all the way to the
             // leaf node in the expected case.
+            // ----------------------------------------------------------------------
             if (iter.node->leaf()) {
                 break;
             }
@@ -2929,6 +3121,7 @@ namespace priv {
         // `key_arg<K>` evaluates to `K` when the functors are transparent and to
         // `key_type` otherwise. It permits template argument deduction on `K` for the
         // transparent case.
+        // ---------------------------------------------------------------------------
         template <class K>
         using key_arg =
             typename KeyArg<IsTransparent<typename Tree::key_compare>::value>::
@@ -3018,6 +3211,7 @@ namespace priv {
         node_type extract(iterator position) {
             // Use Move instead of Transfer, because the rebalancing code expects to
             // have a valid object to scribble metadata bits on top of.
+            // ---------------------------------------------------------------------
             auto node = CommonAccess::Move<node_type>(get_allocator(), position.slot());
             erase(position);
             return node;
@@ -3074,7 +3268,7 @@ namespace priv {
     };
 
     // A common base class for btree_set and btree_map.
-    // -----------------------------------------------
+    // ------------------------------------------------
     template <typename Tree>
     class btree_set_container : public btree_container<Tree> {
         using super_type = btree_container<Tree>;
@@ -3114,12 +3308,14 @@ namespace priv {
             : btree_set_container(init.begin(), init.end(), comp, alloc) {}
 
         // Lookup routines.
+        // ----------------
         template <typename K = key_type>
         size_type count(const key_arg<K> &key) const {
             return this->tree_.count_unique(key);
         }
 
         // Insertion routines.
+        // -------------------
         std::pair<iterator, bool> insert(const value_type &x) {
             return this->tree_.insert_unique(params_type::key(x), x);
         }
@@ -3198,6 +3394,7 @@ namespace priv {
         // Merge routines.
         // Moves elements from `src` into `this`. If the element already exists in
         // `this`, it is left unmodified in `src`.
+        // -----------------------------------------------------------------------
         template <
             typename T,
             typename std::enable_if_t<
@@ -3252,10 +3449,12 @@ namespace priv {
         using const_iterator = typename Tree::const_iterator;
 
         // Inherit constructors.
+        // ---------------------
         using super_type::super_type;
         btree_map_container() {}
 
         // Insertion routines.
+        // -------------------
         template <typename... Args>
         std::pair<iterator, bool> try_emplace(const key_type &k, Args &&... args) {
             return this->tree_.insert_unique(
@@ -3268,6 +3467,7 @@ namespace priv {
             // and then using `k` unsequenced. This is safe because the move is into a
             // forwarding reference and insert_unique guarantees that `key` is never
             // referenced after consuming `args`.
+            // ------------------------------------------------------------------------
             const key_type& key_ref = k;
             return this->tree_.insert_unique(
                 key_ref, std::piecewise_construct, std::forward_as_tuple(std::move(k)),
@@ -3288,6 +3488,7 @@ namespace priv {
             // and then using `k` unsequenced. This is safe because the move is into a
             // forwarding reference and insert_hint_unique guarantees that `key` is
             // never referenced after consuming `args`.
+            // -------------------------------------------------------------------------
             const key_type& key_ref = k;
             return this->tree_
                 .insert_hint_unique(iterator(hint), key_ref, std::piecewise_construct,
@@ -3319,6 +3520,7 @@ namespace priv {
     };
 
     // A common base class for btree_multiset and btree_multimap.
+    // ----------------------------------------------------------
     template <typename Tree>
     class btree_multiset_container : public btree_container<Tree> {
         using super_type = btree_container<Tree>;
@@ -3340,10 +3542,12 @@ namespace priv {
         using node_type = typename super_type::node_type;
 
         // Inherit constructors.
+        // ---------------------
         using super_type::super_type;
         btree_multiset_container() {}
 
         // Range constructor.
+        // ------------------
         template <class InputIterator>
         btree_multiset_container(InputIterator b, InputIterator e,
                                  const key_compare &comp = key_compare(),
@@ -3353,18 +3557,21 @@ namespace priv {
         }
 
         // Initializer list constructor.
+        // -----------------------------
         btree_multiset_container(std::initializer_list<init_type> init,
                                  const key_compare &comp = key_compare(),
                                  const allocator_type &alloc = allocator_type())
             : btree_multiset_container(init.begin(), init.end(), comp, alloc) {}
 
         // Lookup routines.
+        // ----------------
         template <typename K = key_type>
         size_type count(const key_arg<K> &key) const {
             return this->tree_.count_multi(key);
         }
 
         // Insertion routines.
+        // -------------------
         iterator insert(const value_type &x) { return this->tree_.insert_multi(x); }
         iterator insert(value_type &&x) {
             return this->tree_.insert_multi(std::move(x));
@@ -3409,6 +3616,7 @@ namespace priv {
         }
 
         // Deletion routines.
+        // ------------------
         template <typename K = key_type>
         size_type erase(const key_arg<K> &key) {
             return this->tree_.erase_multi(key);
@@ -3425,6 +3633,7 @@ namespace priv {
 
         // Merge routines.
         // Moves all elements from `src` into `this`.
+        // ------------------------------------------
         template <
             typename T,
             typename std::enable_if_t<
@@ -3455,6 +3664,7 @@ namespace priv {
     };
 
     // A base class for btree_multimap.
+    // --------------------------------
     template <typename Tree>
     class btree_multimap_container : public btree_multiset_container<Tree> {
         using super_type = btree_multiset_container<Tree>;
