@@ -1210,7 +1210,14 @@ namespace priv {
             return node == x.node && position == x.position;
         }
         bool operator!=(const const_iterator &x) const {
-            return node != x.node || position != x.position;
+            return !(*this == x);
+        }
+
+        bool operator==(const iterator &x) const {
+            return node == x.node && position == x.position;
+        }
+        bool operator!=(const iterator &x) const {
+            return !(*this == x);
         }
 
         // Accessors for the key/value the iterator is pointing at.
@@ -3205,8 +3212,7 @@ namespace priv {
         bool empty() const { return tree_.empty(); }
 
         friend bool operator==(const btree_container &x, const btree_container &y) {
-            if (x.size() != y.size()) return false;
-            return std::equal(x.begin(), x.end(), y.begin());
+            return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin());
         }
 
         friend bool operator!=(const btree_container &x, const btree_container &y) { return !(x == y); }
