@@ -104,15 +104,13 @@ namespace phmap {
 
         template <class T>
         struct IsTriviallyMoveConstructibleObject
-            : std::integral_constant<
-            bool, std::is_move_constructible_v<type_traits_internal::SingleMemberUnion<T>> &&
-            std::is_trivially_destructible_v<T>> {};
+            : std::integral_constant<bool, std::is_move_constructible_v<type_traits_internal::SingleMemberUnion<T>> &&
+                                     std::is_trivially_destructible_v<T>> {};
 
         template <class T>
         struct IsTriviallyCopyConstructibleObject
-            : std::integral_constant<
-            bool, std::is_copy_constructible_v<type_traits_internal::SingleMemberUnion<T>> &&
-            std::is_trivially_destructible_v<T>> {};
+            : std::integral_constant<bool, std::is_copy_constructible_v<type_traits_internal::SingleMemberUnion<T>> &&
+                                     std::is_trivially_destructible_v<T>> {};
 
         template <class T>
         struct IsTriviallyMoveAssignableReference : std::false_type {};
@@ -193,20 +191,19 @@ namespace phmap {
     }  // namespace type_traits_internal
 
     template <typename T>
-    struct is_copy_assignable : type_traits_internal::is_detected<
-        type_traits_internal::IsCopyAssignableImpl, T> {
+    struct is_copy_assignable : 
+        type_traits_internal::is_detected<type_traits_internal::IsCopyAssignableImpl, T> {
     };
 
     template <typename T>
-    struct is_move_assignable : type_traits_internal::is_detected<
-        type_traits_internal::IsMoveAssignableImpl, T> {
+    struct is_move_assignable : 
+        type_traits_internal::is_detected<type_traits_internal::IsMoveAssignableImpl, T> {
     };
 
     template <typename T>
     struct is_function
-        : std::integral_constant<
-        bool, !(std::is_reference_v<T> ||
-                std::is_const_v<typename std::add_const_t<T>>)> {};
+        : std::integral_constant<bool, !(std::is_reference_v<T> ||
+                                         std::is_const_v<typename std::add_const_t<T>>)> {};
 
 
     namespace type_traits_internal {
@@ -214,9 +211,11 @@ namespace phmap {
         template <typename T>
         class is_trivially_copyable_impl {
             using ExtentsRemoved = typename std::remove_all_extents<T>::type;
+
             static constexpr bool kIsCopyOrMoveConstructible =
                 std::is_copy_constructible_v<ExtentsRemoved> ||
                 std::is_move_constructible_v<ExtentsRemoved>;
+
             static constexpr bool kIsCopyOrMoveAssignable =
                 std::is_copy_assignable_v<ExtentsRemoved> ||
                 std::is_move_assignable_v<ExtentsRemoved>;
@@ -234,8 +233,7 @@ namespace phmap {
 
         template <typename T>
         struct is_trivially_copyable
-            : std::integral_constant<
-            bool, type_traits_internal::is_trivially_copyable_impl<T>::kValue> {};
+            : std::integral_constant<bool, type_traits_internal::is_trivially_copyable_impl<T>::kValue> {};
     }  // namespace type_traits_internal
 
     namespace swap_internal {
@@ -296,11 +294,9 @@ namespace phmap {
         struct OnlyLiteralZero {
             constexpr OnlyLiteralZero(NullPtrT) noexcept {}  // NOLINT
 
-            template <
-                typename T,
-                typename = typename std::enable_if_t<
-                    std::is_same_v<T, std::nullptr_t> ||
-                    (std::is_integral_v<T> && !std::is_same_v<T, int>)>,
+            template <typename T,
+                      typename = typename std::enable_if_t<std::is_same_v<T, std::nullptr_t> ||
+                                                           (std::is_integral_v<T> && !std::is_same_v<T, int>)>,
                 typename = typename Fail<T>::type>
                 OnlyLiteralZero(T);  // NOLINT
         };
@@ -409,8 +405,7 @@ namespace priv {
         StringBtreeDefaultLess(std::less<std::string_view>) {}  // NOLINT
         StringBtreeDefaultLess(phmap::Less<std::string_view>) {}  // NOLINT
 
-        std::weak_ordering operator()(std::string_view lhs,
-                                      std::string_view rhs) const {
+        std::weak_ordering operator()(std::string_view lhs, std::string_view rhs) const {
             return compare_internal::compare_result_as_ordering(lhs.compare(rhs));
         }
     };
@@ -423,8 +418,7 @@ namespace priv {
         StringBtreeDefaultGreater(std::greater<std::string>) {}       // NOLINT
         StringBtreeDefaultGreater(std::greater<std::string_view>) {}  // NOLINT
 
-        std::weak_ordering operator()(std::string_view lhs,
-                                      std::string_view rhs) const {
+        std::weak_ordering operator()(std::string_view lhs, std::string_view rhs) const {
             return compare_internal::compare_result_as_ordering(rhs.compare(lhs));
         }
     };
@@ -487,24 +481,24 @@ namespace priv {
         // A type which indicates if we have a key-compare-to functor or a plain old
         // key-compare functor.
         // -------------------------------------------------------------------------
-        using is_key_compare_to = btree_is_key_compare_to<key_compare, Key>;
+        using is_key_compare_to  = btree_is_key_compare_to<key_compare, Key>;
 
-        using allocator_type = Alloc;
-        using key_type = Key;
-        using size_type = std::size_t ;
-        using difference_type = ptrdiff_t;
+        using allocator_type     = Alloc;
+        using key_type           = Key;
+        using size_type          = std::size_t ;
+        using difference_type    = ptrdiff_t;
 
         // True if this is a multiset or multimap.
         using is_multi_container = std::integral_constant<bool, Multi>;
 
-        using slot_policy = SlotPolicy;
-        using slot_type = typename slot_policy::slot_type;
-        using value_type = typename slot_policy::value_type;
-        using init_type = typename slot_policy::mutable_value_type;
-        using pointer = value_type *;
-        using const_pointer = const value_type *;
-        using reference = value_type &;
-        using const_reference = const value_type &;
+        using slot_policy        = SlotPolicy;
+        using slot_type          = typename slot_policy::slot_type;
+        using value_type         = typename slot_policy::value_type;
+        using init_type          = typename slot_policy::mutable_value_type;
+        using pointer            = value_type *;
+        using const_pointer      = const value_type *;
+        using reference          = value_type &;
+        using const_reference    = const value_type &;
 
         enum {
             kTargetNodeSize = TargetNodeSize,
@@ -705,22 +699,22 @@ namespace priv {
     // -------------------------------------------------------------------------
     template <typename Params>
     class btree_node {
-        using is_key_compare_to = typename Params::is_key_compare_to;
+        using is_key_compare_to  = typename Params::is_key_compare_to;
         using is_multi_container = typename Params::is_multi_container;
-        using field_type = typename Params::node_count_type;
-        using allocator_type = typename Params::allocator_type;
-        using slot_type = typename Params::slot_type;
+        using field_type         = typename Params::node_count_type;
+        using allocator_type     = typename Params::allocator_type;
+        using slot_type          = typename Params::slot_type;
 
     public:
-        using params_type = Params;
-        using key_type = typename Params::key_type;
-        using value_type = typename Params::value_type;
-        using pointer = typename Params::pointer;
-        using const_pointer = typename Params::const_pointer;
-        using reference = typename Params::reference;
+        using params_type     = Params;
+        using key_type        = typename Params::key_type;
+        using value_type      = typename Params::value_type;
+        using pointer         = typename Params::pointer;
+        using const_pointer   = typename Params::const_pointer;
+        using reference       = typename Params::reference;
         using const_reference = typename Params::const_reference;
-        using key_compare = typename Params::key_compare;
-        using size_type = typename Params::size_type;
+        using key_compare     = typename Params::key_compare;
+        using size_type       = typename Params::size_type;
         using difference_type = typename Params::difference_type;
 
         // Btree decides whether to use linear node search as follows:
@@ -732,8 +726,8 @@ namespace priv {
         using use_linear_search = std::integral_constant<
             bool,
             std::is_arithmetic_v<key_type> &&
-            (std::is_same_v<phmap::Less<key_type>, key_compare> ||
-             std::is_same_v<std::less<key_type>, key_compare> ||
+            (std::is_same_v<phmap::Less<key_type>,  key_compare> ||
+             std::is_same_v<std::less<key_type>,    key_compare> ||
              std::is_same_v<std::greater<key_type>, key_compare>)>;
 
 
@@ -774,14 +768,13 @@ namespace priv {
         // -----------------------------------------------------------------------
         constexpr static size_type NodeTargetValues(const int begin, const int end) {
             return begin == end ? begin
-                : SizeWithNValues((begin + end) / 2 + 1) >
-                params_type::kTargetNodeSize
+                : SizeWithNValues((begin + end) / 2 + 1) > params_type::kTargetNodeSize
                 ? NodeTargetValues(begin, (begin + end) / 2)
                 : NodeTargetValues((begin + end) / 2 + 1, end);
         }
 
         enum {
-            kTargetNodeSize = params_type::kTargetNodeSize,
+            kTargetNodeSize   = params_type::kTargetNodeSize,
             kNodeTargetValues = NodeTargetValues(0, params_type::kTargetNodeSize),
 
             // We need a minimum of 3 values per internal node in order to perform
@@ -830,8 +823,7 @@ namespace priv {
         template <size_type N>
         inline const typename layout_type::template ElementType<N> *GetField() const {
             assert(N < 3 || !leaf());
-            return InternalLayout().template Pointer<N>(
-                reinterpret_cast<const char *>(this));
+            return InternalLayout().template Pointer<N>(reinterpret_cast<const char *>(this));
         }
 
         void set_parent(btree_node *p)     { *GetField<0>() = p; }
@@ -1045,15 +1037,12 @@ namespace priv {
         // Removes the values at positions [i, i + to_erase), shifting all values
         // after that range to the left by to_erase. Does not change children at all.
         // --------------------------------------------------------------------------
-        void remove_values_ignore_children(int i, size_type to_erase,
-                                           allocator_type *alloc);
+        void remove_values_ignore_children(int i, size_type to_erase, allocator_type *alloc);
 
         // Rebalances a node with its right sibling.
         // -----------------------------------------
-        void rebalance_right_to_left(int to_move, btree_node *right,
-                                     allocator_type *alloc);
-        void rebalance_left_to_right(int to_move, btree_node *right,
-                                     allocator_type *alloc);
+        void rebalance_right_to_left(int to_move, btree_node *right, allocator_type *alloc);
+        void rebalance_left_to_right(int to_move, btree_node *right, allocator_type *alloc);
 
         // Splits a node, moving a portion of the node's values to its right sibling.
         // --------------------------------------------------------------------------
@@ -1076,8 +1065,7 @@ namespace priv {
             n->set_start(0);
             n->set_count(0);
             n->set_max_count((field_type)max_cnt);
-            SanitizerPoisonMemoryRegion(
-                n->slot(0), max_cnt * sizeof(slot_type));
+            SanitizerPoisonMemoryRegion(n->slot(0), max_cnt * sizeof(slot_type));
             return n;
         }
 
@@ -1086,8 +1074,7 @@ namespace priv {
             // Set `max_count` to a sentinel value to indicate that this node is
             // internal.
             n->set_max_count(kInternalNodeMaxCount);
-            SanitizerPoisonMemoryRegion(
-                &n->mutable_child(0), (kNodeValues + 1) * sizeof(btree_node *));
+            SanitizerPoisonMemoryRegion(&n->mutable_child(0), (kNodeValues + 1) * sizeof(btree_node *));
             return n;
         }
 
@@ -1121,18 +1108,15 @@ namespace priv {
         void uninitialized_move_n(const size_type n, const size_type i,
                                   const size_type j, btree_node *x,
                                   allocator_type *alloc) {
-            SanitizerUnpoisonMemoryRegion(
-                x->slot(j), n * sizeof(slot_type));
-            for (slot_type *src = slot(i), *end = src + n, *dest = x->slot(j);
-                 src != end; ++src, ++dest) {
+            SanitizerUnpoisonMemoryRegion(x->slot(j), n * sizeof(slot_type));
+            for (slot_type *src = slot(i), *end = src + n, *dest = x->slot(j); src != end; ++src, ++dest) {
                 params_type::construct(alloc, dest, src);
             }
         }
 
         // Destroys a range of n values, starting at index i.
         // --------------------------------------------------
-        void value_destroy_n(const size_type i, const size_type n,
-                             allocator_type *alloc) {
+        void value_destroy_n(const size_type i, const size_type n, allocator_type *alloc) {
             for (size_type j = 0; j < n; ++j) {
                 value_destroy(i + j, alloc);
             }
@@ -1140,8 +1124,10 @@ namespace priv {
 
         template <typename P>
         friend class btree;
+
         template <typename N, typename R, typename P>
         friend struct btree_iterator;
+
         friend class BtreeNodePeer;
     };
 
@@ -1182,10 +1168,9 @@ namespace priv {
         // binary size reasons.
         // --------------------------------------------------------------------------
         template <typename N, typename R, typename P,
-                  std::enable_if_t<
-                      std::is_same_v<btree_iterator<N, R, P>, iterator> &&
-                      std::is_same_v<btree_iterator, const_iterator>,
-                      int> = 0>
+                  std::enable_if_t<std::is_same_v<btree_iterator<N, R, P>, iterator> &&
+                                   std::is_same_v<btree_iterator, const_iterator>,
+                                   int> = 0>
             btree_iterator(const btree_iterator<N, R, P> &x)  // NOLINT
             : node(x.node), position(x.position) {}
 
@@ -1196,10 +1181,9 @@ namespace priv {
         // non-const methods and the container owns the nodes.
         // -----------------------------------------------------------------------
         template <typename N, typename R, typename P,
-                  std::enable_if_t<
-                      std::is_same_v<btree_iterator<N, R, P>, const_iterator> &&
-                      std::is_same_v<btree_iterator, iterator>,
-                      int> = 0>
+                  std::enable_if_t<std::is_same_v<btree_iterator<N, R, P>, const_iterator> &&
+                                   std::is_same_v<btree_iterator, iterator>,
+                                   int> = 0>
             explicit btree_iterator(const btree_iterator<N, R, P> &x)
             : node(const_cast<node_type *>(x.node)), position(x.position) {}
 
@@ -1260,16 +1244,22 @@ namespace priv {
     private:
         template <typename Params>
         friend class btree;
+
         template <typename Tree>
         friend class btree_container;
+
         template <typename Tree>
         friend class btree_set_container;
+
         template <typename Tree>
         friend class btree_map_container;
+
         template <typename Tree>
         friend class btree_multiset_container;
+
         template <typename N, typename R, typename P>
         friend struct btree_iterator;
+
         template <typename TreeType, typename CheckerType>
         friend class base_checker;
 
@@ -1349,27 +1339,27 @@ namespace priv {
         };
 
     public:
-        using key_type = typename Params::key_type;
-        using value_type = typename Params::value_type;
-        using size_type = typename Params::size_type;
+        using key_type        = typename Params::key_type;
+        using value_type      = typename Params::value_type;
+        using size_type       = typename Params::size_type;
         using difference_type = typename Params::difference_type;
-        using key_compare = typename Params::key_compare;
-        using value_compare = typename Params::value_compare;
-        using allocator_type = typename Params::allocator_type;
-        using reference = typename Params::reference;
+        using key_compare     = typename Params::key_compare;
+        using value_compare   = typename Params::value_compare;
+        using allocator_type  = typename Params::allocator_type;
+        using reference       = typename Params::reference;
         using const_reference = typename Params::const_reference;
-        using pointer = typename Params::pointer;
-        using const_pointer = typename Params::const_pointer;
-        using iterator = btree_iterator<node_type, reference, pointer>;
-        using const_iterator = typename iterator::const_iterator;
-        using reverse_iterator = std::reverse_iterator<iterator>;
+        using pointer         = typename Params::pointer;
+        using const_pointer   = typename Params::const_pointer;
+        using iterator        = btree_iterator<node_type, reference, pointer>;
+        using const_iterator  = typename iterator::const_iterator;
+        using reverse_iterator       = std::reverse_iterator<iterator>;
         using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-        using node_handle_type = node_handle<Params, Params, allocator_type>;
+        using node_handle_type       = node_handle<Params, Params, allocator_type>;
 
         // Internal types made public for use by btree_container types.
         // ------------------------------------------------------------
         using params_type = Params;
-        using slot_type = typename Params::slot_type;
+        using slot_type   = typename Params::slot_type;
 
     private:
         // For use in copy_or_move_values_in_order.
@@ -1393,6 +1383,7 @@ namespace priv {
         btree(const key_compare &comp, const allocator_type &alloc);
 
         btree(const btree &x);
+
         btree(btree &&x) noexcept
             : root_(std::move(x.root_)),
             rightmost_(std::exchange(x.rightmost_, EmptyNode())),
@@ -2603,10 +2594,12 @@ namespace priv {
         size_type to_erase = _end.position - _begin.position;
         if (!node->leaf()) {
             // Delete all children between _begin and _end.
+            // --------------------------------------------
             for (size_type i = 0; i < to_erase; ++i) {
                 internal_clear(node->child(_begin.position + i + 1));
             }
             // Rotate children after _end into new positions.
+            // ----------------------------------------------
             for (size_type i = _begin.position + to_erase + 1; i <= node->count(); ++i) {
                 node->set_child(i - to_erase, node->child(i));
                 node->clear_child(i);
@@ -2625,8 +2618,7 @@ namespace priv {
     }
 
     template <typename P>
-    auto btree<P>::erase_from_leaf_node(iterator _begin, size_type to_erase)
-        -> iterator {
+    auto btree<P>::erase_from_leaf_node(iterator _begin, size_type to_erase) -> iterator {
         node_type *node = _begin.node;
         assert(node->leaf());
         assert(node->count() > _begin.position);
@@ -2684,9 +2676,11 @@ namespace priv {
         if (std::allocator_traits<
             allocator_type>::propagate_on_container_swap::value) {
             // Note: `root_` also contains the allocator and the key comparator.
+            // -----------------------------------------------------------------
             swap(root_, x.root_);
         } else {
             // It's undefined behavior if the allocators are unequal here.
+            // -----------------------------------------------------------
             assert(allocator() == x.allocator());
             swap(mutable_root(), x.mutable_root());
             swap(*mutable_key_comp(), *x.mutable_key_comp());
