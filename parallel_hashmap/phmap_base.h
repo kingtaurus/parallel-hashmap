@@ -1260,15 +1260,9 @@ inline void SanitizerUnpoisonObject(const T* object) {
 
 namespace {
     template <typename T>
-#ifdef PHMAP_HAVE_EXCEPTIONS
     [[noreturn]] void Throw(const T& error) {
         throw error;
     }
-#else
-    [[noreturn]] void Throw(const T&) {
-        std::abort();
-    }
-#endif
 }  // namespace
 
 static inline void ThrowStdOutOfRange(const std::string& what_arg) {

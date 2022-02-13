@@ -60,18 +60,14 @@
 // -----------------------------------------------------------------------------
 // Some sanity checks
 // -----------------------------------------------------------------------------
-//#if defined(__CYGWIN__)
-//    #error "Cygwin is not supported."
-//#endif
-
-#if defined(_MSC_FULL_VER) && _MSC_FULL_VER < 190023918 && !defined(__clang__)
+#if defined(_MSC_FULL_VER) && _MSC_FULL_VER < 192930139 && !defined(__clang__)
     #error "phmap requires Visual Studio 2015 Update 2 or higher."
 #endif
 
-// We support gcc 4.7 and later.
+// We support gcc 10 and later.
 #if defined(__GNUC__) && !defined(__clang__)
-    #if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
-        #error "phmap requires gcc 4.7 or higher."
+    #if __GNUC__ < 10
+        #error "phmap requires gcc 10 or higher."
     #endif
 #endif
 
@@ -83,8 +79,8 @@
 
 // Enforce C++11 as the minimum. 
 #if defined(__cplusplus) && !defined(_MSC_VER)
-    #if __cplusplus < 201103L
-        #error "C++ versions less than C++11 are not supported."
+    #if __cplusplus < 202004L
+        #error "C++ versions less than C++20 are not supported."
     #endif
 #endif
 
@@ -120,71 +116,7 @@
     #define PHMAP_HAVE_BUILTIN(x) 0
 #endif
 
-#if (defined(_MSVC_LANG) && _MSVC_LANG >= 201703) || __cplusplus >= 201703
-    #define PHMAP_HAVE_CC17 1
-#else
-    #define PHMAP_HAVE_CC17 0
-#endif
-
 #define PHMAP_BRANCHLESS 1
-
-// ----------------------------------------------------------------
-// Checks whether `std::is_trivially_destructible<T>` is supported.
-// ----------------------------------------------------------------
-#ifdef PHMAP_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE
-    #error PHMAP_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE cannot be directly set
-#elif defined(_LIBCPP_VERSION) ||                                        \
-    (!defined(__clang__) && defined(__GNUC__) && defined(__GLIBCXX__) && \
-     (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8))) ||        \
-    defined(_MSC_VER)
-    #define PHMAP_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE 1
-#endif
-
-// --------------------------------------------------------------
-// Checks whether `std::is_trivially_default_constructible<T>` is 
-// supported.
-// --------------------------------------------------------------
-#if defined(PHMAP_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE)
-    #error PHMAP_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE cannot be directly set
-#elif defined(PHMAP_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE)
-    #error PHMAP_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE cannot directly set
-#elif (defined(__clang__) && defined(_LIBCPP_VERSION)) ||        \
-    (!defined(__clang__) && defined(__GNUC__) &&                 \
-     (__GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ >= 1)) && \
-     (defined(_LIBCPP_VERSION) || defined(__GLIBCXX__))) ||      \
-    (defined(_MSC_VER) && !defined(__NVCC__))
-    #define PHMAP_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE 1
-    #define PHMAP_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE 1
-#endif
-
-// -------------------------------------------------------------------
-// Checks whether C++11's `thread_local` storage duration specifier is
-// supported.
-// -------------------------------------------------------------------
-#ifdef PHMAP_HAVE_THREAD_LOCAL
-    #error PHMAP_HAVE_THREAD_LOCAL cannot be directly set
-#elif defined(__APPLE__)
-    #if __has_feature(cxx_thread_local) && \
-        !(TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_9_0)
-        #define PHMAP_HAVE_THREAD_LOCAL 1
-    #endif
-#else  // !defined(__APPLE__)
-    #define PHMAP_HAVE_THREAD_LOCAL 1
-#endif
-
-#if defined(__ANDROID__) && defined(__clang__)
-
-    #if __has_include(<android/ndk-version.h>)
-        #include <android/ndk-version.h>
-    #endif  // __has_include(<android/ndk-version.h>)
-
-    #if defined(__ANDROID__) && defined(__clang__) && defined(__NDK_MAJOR__) && \
-        defined(__NDK_MINOR__) &&                                               \
-        ((__NDK_MAJOR__ < 12) || ((__NDK_MAJOR__ == 12) && (__NDK_MINOR__ < 1)))
-        #undef PHMAP_HAVE_TLS
-        #undef PHMAP_HAVE_THREAD_LOCAL
-    #endif
-#endif 
 
 // ------------------------------------------------------------
 // Checks whether the __int128 compiler extension for a 128-bit 
@@ -204,35 +136,6 @@
     #endif  // defined(__CUDACC__)
 #endif
 
-// ------------------------------------------------------------------
-// Checks whether the compiler both supports and enables exceptions. 
-// ------------------------------------------------------------------
-#ifdef PHMAP_HAVE_EXCEPTIONS
-    #error PHMAP_HAVE_EXCEPTIONS cannot be directly set.
-#elif defined(__clang__)
-    #if defined(__EXCEPTIONS) && __has_feature(cxx_exceptions)
-        #define PHMAP_HAVE_EXCEPTIONS 1
-    #endif  // defined(__EXCEPTIONS) && __has_feature(cxx_exceptions)
-#elif !(defined(__GNUC__) && (__GNUC__ < 5) && !defined(__EXCEPTIONS)) &&    \
-    !(defined(__GNUC__) && (__GNUC__ >= 5) && !defined(__cpp_exceptions)) && \
-    !(defined(_MSC_VER) && !defined(_CPPUNWIND))
-    #define PHMAP_HAVE_EXCEPTIONS 1
-#endif
-
-
-// -----------------------------------------------------------------------
-// Checks whether the platform has an mmap(2) implementation as defined in
-// POSIX.1-2001.
-// -----------------------------------------------------------------------
-#ifdef PHMAP_HAVE_MMAP
-    #error PHMAP_HAVE_MMAP cannot be directly set
-#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) ||   \
-    defined(__ros__) || defined(__native_client__) || defined(__asmjs__) || \
-    defined(__wasm__) || defined(__Fuchsia__) || defined(__sun) || \
-    defined(__ASYLO__)
-    #define PHMAP_HAVE_MMAP 1
-#endif
-
 // -----------------------------------------------------------------------
 // Checks the endianness of the platform.
 // -----------------------------------------------------------------------
@@ -244,11 +147,9 @@
     #error "PHMAP_IS_LITTLE_ENDIAN cannot be directly set."
 #endif
 
-#if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
-     __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
     #define PHMAP_IS_LITTLE_ENDIAN 1
-#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
-    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
     #define PHMAP_IS_BIG_ENDIAN 1
 #elif defined(_WIN32)
     #define PHMAP_IS_LITTLE_ENDIAN 1
@@ -256,94 +157,12 @@
     #error "phmap endian detection needs to be set up for your compiler"
 #endif
 
-#if defined(__APPLE__) && defined(_LIBCPP_VERSION) && \
-    defined(__MAC_OS_X_VERSION_MIN_REQUIRED__) &&     \
-    __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 101400
-    #define PHMAP_INTERNAL_MACOS_CXX17_TYPES_UNAVAILABLE 1
-#else
-    #define PHMAP_INTERNAL_MACOS_CXX17_TYPES_UNAVAILABLE 0
-#endif
-
-// ---------------------------------------------------------------------------
-// Checks whether C++17 std::any is available by checking whether <any> exists.
-// ---------------------------------------------------------------------------
-#ifdef PHMAP_HAVE_STD_ANY
-    #error "PHMAP_HAVE_STD_ANY cannot be directly set."
-#endif
-
-#ifdef __has_include
-    #if __has_include(<any>) && __cplusplus >= 201703L && \
-        !PHMAP_INTERNAL_MACOS_CXX17_TYPES_UNAVAILABLE
-        #define PHMAP_HAVE_STD_ANY 1
-    #endif
-#endif
-
-#ifdef PHMAP_HAVE_STD_OPTIONAL
-    #error "PHMAP_HAVE_STD_OPTIONAL cannot be directly set."
-#endif
-
-#ifdef __has_include
-    #if __has_include(<optional>) && __cplusplus >= 201703L && \
-        !PHMAP_INTERNAL_MACOS_CXX17_TYPES_UNAVAILABLE
-        #define PHMAP_HAVE_STD_OPTIONAL 1
-    #endif
-#endif
-
-#ifdef PHMAP_HAVE_STD_VARIANT
-    #error "PHMAP_HAVE_STD_VARIANT cannot be directly set."
-#endif
-
-#ifdef __has_include
-    #if __has_include(<variant>) && __cplusplus >= 201703L && \
-        !PHMAP_INTERNAL_MACOS_CXX17_TYPES_UNAVAILABLE
-        #define PHMAP_HAVE_STD_VARIANT 1
-    #endif
-#endif
-
-#ifdef PHMAP_HAVE_STD_STRING_VIEW
-    #error "PHMAP_HAVE_STD_STRING_VIEW cannot be directly set."
-#endif
-
-#ifdef __has_include
-    #if __has_include(<string_view>) && __cplusplus >= 201703L && \
-        (!defined(_MSC_VER) || _MSC_VER >= 1920) // vs2019
-        #define PHMAP_HAVE_STD_STRING_VIEW 1
-    #endif
-#endif
-
-// #pragma message(PHMAP_VAR_NAME_VALUE(_MSVC_LANG))
-
-#if defined(_MSC_VER) && _MSC_VER >= 1910 && PHMAP_HAVE_CC17
-    // #define PHMAP_HAVE_STD_ANY 1
-    #define PHMAP_HAVE_STD_OPTIONAL 1
-    #define PHMAP_HAVE_STD_VARIANT 1
-    #if !defined(PHMAP_HAVE_STD_STRING_VIEW) && _MSC_VER >= 1920
-        #define PHMAP_HAVE_STD_STRING_VIEW 1
-    #endif
-#endif
-
-#if PHMAP_HAVE_CC17
-    #define PHMAP_HAVE_SHARED_MUTEX 1
-#endif
-
-#ifndef PHMAP_HAVE_STD_STRING_VIEW
-    #define PHMAP_HAVE_STD_STRING_VIEW 0
-#endif
-
-// In debug mode, MSVC 2017's std::variant throws a EXCEPTION_ACCESS_VIOLATION
-// SEH exception from emplace for variant<SomeStruct> when constructing the
-// struct can throw. This defeats some of variant_test and
-// variant_exception_safety_test.
-#if defined(_MSC_VER) && _MSC_VER >= 1700 && defined(_DEBUG)
-    #define PHMAP_INTERNAL_MSVC_2017_DBG_MODE
-#endif
-
 // ---------------------------------------------------------------------------
 // Checks whether wchar_t is treated as a native type
 // (MSVC: /Zc:wchar_t- treats wchar_t as unsigned short)
 // ---------------------------------------------------------------------------
 #if !defined(_MSC_VER) || defined(_NATIVE_WCHAR_T_DEFINED)
-#define PHMAP_HAS_NATIVE_WCHAR_T
+    #define PHMAP_HAS_NATIVE_WCHAR_T
 #endif
 
 // -----------------------------------------------------------------------------
@@ -401,8 +220,7 @@
     #define PHMAP_SCANF_ATTRIBUTE(string_index, first_to_check)
 #endif
 
-#if PHMAP_HAVE_ATTRIBUTE(always_inline) || \
-    (defined(__GNUC__) && !defined(__clang__))
+#if PHMAP_HAVE_ATTRIBUTE(always_inline) || (defined(__GNUC__) && !defined(__clang__))
     #define PHMAP_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
     #define PHMAP_HAVE_ATTRIBUTE_ALWAYS_INLINE 1
 #else
@@ -428,8 +246,7 @@
     #define PHMAP_HAVE_ATTRIBUTE_NO_TAIL_CALL 0
 #endif
 
-#if (PHMAP_HAVE_ATTRIBUTE(weak) || \
-     (defined(__GNUC__) && !defined(__clang__))) && \
+#if (PHMAP_HAVE_ATTRIBUTE(weak) || (defined(__GNUC__) && !defined(__clang__))) && \
     !(defined(__llvm__) && defined(_WIN32))
     #undef PHMAP_ATTRIBUTE_WEAK
     #define PHMAP_ATTRIBUTE_WEAK __attribute__((weak))
@@ -471,10 +288,8 @@
     #define PHMAP_ATTRIBUTE_NO_SANITIZE_THREAD
 #endif
 
-#if defined(__GNUC__) && \
-    (defined(UNDEFINED_BEHAVIOR_SANITIZER) || defined(ADDRESS_SANITIZER))
-    #define PHMAP_ATTRIBUTE_NO_SANITIZE_UNDEFINED \
-      __attribute__((no_sanitize("undefined")))
+#if defined(__GNUC__) && (defined(UNDEFINED_BEHAVIOR_SANITIZER) || defined(ADDRESS_SANITIZER))
+    #define PHMAP_ATTRIBUTE_NO_SANITIZE_UNDEFINED __attribute__((no_sanitize("undefined")))
 #else
     #define PHMAP_ATTRIBUTE_NO_SANITIZE_UNDEFINED
 #endif
@@ -486,74 +301,15 @@
 #endif
 
 #if defined(__GNUC__) && defined(SAFESTACK_SANITIZER)
-    #define PHMAP_ATTRIBUTE_NO_SANITIZE_SAFESTACK \
-      __attribute__((no_sanitize("safe-stack")))
+    #define PHMAP_ATTRIBUTE_NO_SANITIZE_SAFESTACK __attribute__((no_sanitize("safe-stack")))
 #else
     #define PHMAP_ATTRIBUTE_NO_SANITIZE_SAFESTACK
 #endif
 
-#if PHMAP_HAVE_ATTRIBUTE(returns_nonnull) || \
-    (defined(__GNUC__) && \
-     (__GNUC__ > 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 9)) && \
-     !defined(__clang__))
+#if PHMAP_HAVE_ATTRIBUTE(returns_nonnull) || (defined(__GNUC__)  && !defined(__clang__))
     #define PHMAP_ATTRIBUTE_RETURNS_NONNULL __attribute__((returns_nonnull))
 #else
     #define PHMAP_ATTRIBUTE_RETURNS_NONNULL
-#endif
-
-#ifdef PHMAP_HAVE_ATTRIBUTE_SECTION
-    #error PHMAP_HAVE_ATTRIBUTE_SECTION cannot be directly set
-#elif (PHMAP_HAVE_ATTRIBUTE(section) ||                \
-       (defined(__GNUC__) && !defined(__clang__))) && \
-    !defined(__APPLE__) && PHMAP_HAVE_ATTRIBUTE_WEAK
-    #define PHMAP_HAVE_ATTRIBUTE_SECTION 1
-    #ifndef PHMAP_ATTRIBUTE_SECTION
-        #define PHMAP_ATTRIBUTE_SECTION(name) \
-          __attribute__((section(#name))) __attribute__((noinline))
-    #endif
-    #ifndef PHMAP_ATTRIBUTE_SECTION_VARIABLE
-        #define PHMAP_ATTRIBUTE_SECTION_VARIABLE(name) __attribute__((section(#name)))
-    #endif
-    #ifndef PHMAP_DECLARE_ATTRIBUTE_SECTION_VARS
-        #define PHMAP_DECLARE_ATTRIBUTE_SECTION_VARS(name) \
-          extern char __start_##name[] PHMAP_ATTRIBUTE_WEAK;    \
-          extern char __stop_##name[] PHMAP_ATTRIBUTE_WEAK
-    #endif
-    #ifndef PHMAP_DEFINE_ATTRIBUTE_SECTION_VARS
-        #define PHMAP_INIT_ATTRIBUTE_SECTION_VARS(name)
-        #define PHMAP_DEFINE_ATTRIBUTE_SECTION_VARS(name)
-    #endif
-    #define PHMAP_ATTRIBUTE_SECTION_START(name) \
-      (reinterpret_cast<void *>(__start_##name))
-    #define PHMAP_ATTRIBUTE_SECTION_STOP(name) \
-      (reinterpret_cast<void *>(__stop_##name))
-#else  // !PHMAP_HAVE_ATTRIBUTE_SECTION
-    #define PHMAP_HAVE_ATTRIBUTE_SECTION 0
-    #define PHMAP_ATTRIBUTE_SECTION(name)
-    #define PHMAP_ATTRIBUTE_SECTION_VARIABLE(name)
-    #define PHMAP_INIT_ATTRIBUTE_SECTION_VARS(name)
-    #define PHMAP_DEFINE_ATTRIBUTE_SECTION_VARS(name)
-    #define PHMAP_DECLARE_ATTRIBUTE_SECTION_VARS(name)
-    #define PHMAP_ATTRIBUTE_SECTION_START(name) (reinterpret_cast<void *>(0))
-    #define PHMAP_ATTRIBUTE_SECTION_STOP(name) (reinterpret_cast<void *>(0))
-#endif  // PHMAP_ATTRIBUTE_SECTION
-
-#if PHMAP_HAVE_ATTRIBUTE(force_align_arg_pointer) || \
-    (defined(__GNUC__) && !defined(__clang__))
-    #if defined(__i386__)
-        #define PHMAP_ATTRIBUTE_STACK_ALIGN_FOR_OLD_LIBC \
-          __attribute__((force_align_arg_pointer))
-        #define PHMAP_REQUIRE_STACK_ALIGN_TRAMPOLINE (0)
-    #elif defined(__x86_64__)
-        #define PHMAP_REQUIRE_STACK_ALIGN_TRAMPOLINE (1)
-        #define PHMAP_ATTRIBUTE_STACK_ALIGN_FOR_OLD_LIBC
-    #else  // !__i386__ && !__x86_64
-        #define PHMAP_REQUIRE_STACK_ALIGN_TRAMPOLINE (0)
-        #define PHMAP_ATTRIBUTE_STACK_ALIGN_FOR_OLD_LIBC
-    #endif  // __i386__
-#else
-    #define PHMAP_ATTRIBUTE_STACK_ALIGN_FOR_OLD_LIBC
-    #define PHMAP_REQUIRE_STACK_ALIGN_TRAMPOLINE (0)
 #endif
 
 #if PHMAP_HAVE_ATTRIBUTE(nodiscard)
@@ -646,15 +402,6 @@
 
 
 // ----------------------------------------------------------------------
-// constexpr if
-// ----------------------------------------------------------------------
-#if PHMAP_HAVE_CC17
-    #define PHMAP_IF_CONSTEXPR(expr) if constexpr ((expr))
-#else 
-    #define PHMAP_IF_CONSTEXPR(expr) if ((expr))
-#endif
-
-// ----------------------------------------------------------------------
 // base/macros.h
 // ----------------------------------------------------------------------
 
@@ -674,98 +421,5 @@ namespace macros_internal {
     auto ArraySizeHelper(const T (&array)[N]) -> char (&)[N];
 }  // namespace macros_internal
 }  // namespace phmap
-
-// TODO(zhangxy): Use c++17 standard [[fallthrough]] macro, when supported.
-#if defined(__clang__) && defined(__has_warning)
-    #if __has_feature(cxx_attributes) && __has_warning("-Wimplicit-fallthrough")
-        #define PHMAP_FALLTHROUGH_INTENDED [[clang::fallthrough]]
-    #endif
-#elif defined(__GNUC__) && __GNUC__ >= 7
-    #define PHMAP_FALLTHROUGH_INTENDED [[gnu::fallthrough]]
-#endif
-
-#ifndef PHMAP_FALLTHROUGH_INTENDED
-    #define PHMAP_FALLTHROUGH_INTENDED \
-      do {  } while (0)
-#endif
-
-// PHMAP_DEPRECATED()
-//
-// Marks a deprecated class, struct, enum, function, method and variable
-// declarations. The macro argument is used as a custom diagnostic message (e.g.
-// suggestion of a better alternative).
-//
-// Example:
-//
-//   class PHMAP_DEPRECATED("Use Bar instead") Foo {...};
-//   PHMAP_DEPRECATED("Use Baz instead") void Bar() {...}
-//
-// Every usage of a deprecated entity will trigger a warning when compiled with
-// clang's `-Wdeprecated-declarations` option. This option is turned off by
-// default, but the warnings will be reported by clang-tidy.
-#if defined(__clang__) && __cplusplus >= 201103L
-    #define PHMAP_DEPRECATED(message) __attribute__((deprecated(message)))
-#endif
-
-#ifndef PHMAP_DEPRECATED
-    #define PHMAP_DEPRECATED(message)
-#endif
-
-// PHMAP_BAD_CALL_IF()
-//
-// Used on a function overload to trap bad calls: any call that matches the
-// overload will cause a compile-time error. This macro uses a clang-specific
-// "enable_if" attribute, as described at
-// http://clang.llvm.org/docs/AttributeReference.html#enable-if
-//
-// Overloads which use this macro should be bracketed by
-// `#ifdef PHMAP_BAD_CALL_IF`.
-//
-// Example:
-//
-//   int isdigit(int c);
-//   #ifdef PHMAP_BAD_CALL_IF
-//   int isdigit(int c)
-//     PHMAP_BAD_CALL_IF(c <= -1 || c > 255,
-//                       "'c' must have the value of an unsigned char or EOF");
-//   #endif // PHMAP_BAD_CALL_IF
-
-#if defined(__clang__)
-    #if __has_attribute(enable_if)
-        #define PHMAP_BAD_CALL_IF(expr, msg) \
-            __attribute__((enable_if(expr, "Bad call trap"), unavailable(msg)))
-    #endif
-#endif
-
-// PHMAP_ASSERT()
-//
-// In C++11, `assert` can't be used portably within constexpr functions.
-// PHMAP_ASSERT functions as a runtime assert but works in C++11 constexpr
-// functions.  Example:
-//
-// constexpr double Divide(double a, double b) {
-//   return PHMAP_ASSERT(b != 0), a / b;
-// }
-//
-// This macro is inspired by
-// https://akrzemi1.wordpress.com/2017/05/18/asserts-in-constexpr-functions/
-#if defined(NDEBUG)
-    #define PHMAP_ASSERT(expr) (false ? (void)(expr) : (void)0)
-#else
-    #define PHMAP_ASSERT(expr)              \
-      (PHMAP_PREDICT_TRUE((expr)) ? (void)0 \
-                                 : [] { assert(false && #expr); }())  // NOLINT
-#endif
-
-#ifdef PHMAP_HAVE_EXCEPTIONS
-    #define PHMAP_INTERNAL_TRY try
-    #define PHMAP_INTERNAL_CATCH_ANY catch (...)
-    #define PHMAP_INTERNAL_RETHROW do { throw; } while (false)
-#else  // PHMAP_HAVE_EXCEPTIONS
-    #define PHMAP_INTERNAL_TRY if (true)
-    #define PHMAP_INTERNAL_CATCH_ANY else if (false)
-    #define PHMAP_INTERNAL_RETHROW do {} while (false)
-#endif  // PHMAP_HAVE_EXCEPTIONS
-
 
 #endif // phmap_config_h_guard_

@@ -164,7 +164,7 @@ TEST(Group, EmptyGroup) {
 }
 
 TEST(Group, Match) {
-  PHMAP_IF_CONSTEXPR (Group::kWidth == 16) {
+    if constexpr (Group::kWidth == 16) {
     ctrl_t group[] = {kEmpty, 1, kDeleted, 3, kEmpty, 5, kSentinel, 7,
                       7,      5, 3,        1, 1,      1, 1,         1};
     EXPECT_THAT(Group{group}.Match(0), ElementsAre());
@@ -172,7 +172,7 @@ TEST(Group, Match) {
     EXPECT_THAT(Group{group}.Match(3), ElementsAre(3, 10));
     EXPECT_THAT(Group{group}.Match(5), ElementsAre(5, 9));
     EXPECT_THAT(Group{group}.Match(7), ElementsAre(7, 8));
-  } else PHMAP_IF_CONSTEXPR (Group::kWidth == 8) {
+  } else if constexpr (Group::kWidth == 8) {
     ctrl_t group[] = {kEmpty, 1, 2, kDeleted, 2, 1, kSentinel, 1};
     EXPECT_THAT(Group{group}.Match(0), ElementsAre());
     EXPECT_THAT(Group{group}.Match(1), ElementsAre(1, 5, 7));
@@ -183,11 +183,11 @@ TEST(Group, Match) {
 }
 
 TEST(Group, MatchEmpty) {
-  PHMAP_IF_CONSTEXPR (Group::kWidth == 16) {
+  if constexpr (Group::kWidth == 16) {
     ctrl_t group[] = {kEmpty, 1, kDeleted, 3, kEmpty, 5, kSentinel, 7,
                       7,      5, 3,        1, 1,      1, 1,         1};
     EXPECT_THAT(Group{group}.MatchEmpty(), ElementsAre(0, 4));
-  } else PHMAP_IF_CONSTEXPR (Group::kWidth == 8) {
+  } else if constexpr (Group::kWidth == 8) {
     ctrl_t group[] = {kEmpty, 1, 2, kDeleted, 2, 1, kSentinel, 1};
     EXPECT_THAT(Group{group}.MatchEmpty(), ElementsAre(0));
   } else {
@@ -196,11 +196,11 @@ TEST(Group, MatchEmpty) {
 }
 
 TEST(Group, MatchEmptyOrDeleted) {
-  PHMAP_IF_CONSTEXPR (Group::kWidth == 16) {
+  if constexpr (Group::kWidth == 16) {
     ctrl_t group[] = {kEmpty, 1, kDeleted, 3, kEmpty, 5, kSentinel, 7,
                       7,      5, 3,        1, 1,      1, 1,         1};
     EXPECT_THAT(Group{group}.MatchEmptyOrDeleted(), ElementsAre(0, 2, 4));
-  } else PHMAP_IF_CONSTEXPR (Group::kWidth == 8) {
+  } else if constexpr (Group::kWidth == 8) {
     ctrl_t group[] = {kEmpty, 1, 2, kDeleted, 2, 1, kSentinel, 1};
     EXPECT_THAT(Group{group}.MatchEmptyOrDeleted(), ElementsAre(0, 3));
   } else {
@@ -1102,7 +1102,7 @@ ExpectedStats XorSeedExpectedStats() {
 
   // The effective load factor is larger in non-opt mode because we insert
   // elements out of order.
-  PHMAP_IF_CONSTEXPR (priv::Group::kWidth == 8) {
+  if constexpr (priv::Group::kWidth == 8) {
       if (kRandomizesInserts) {
           return {0.05,
                   1.0,
@@ -1206,7 +1206,7 @@ ExpectedStats LinearTransformExpectedStats() {
 
   // The effective load factor is larger in non-opt mode because we insert
   // elements out of order.
-  PHMAP_IF_CONSTEXPR (priv::Group::kWidth == 8) {
+  if constexpr (priv::Group::kWidth == 8) {
       if (kRandomizesInserts) {
           return {0.1,
                   0.5,

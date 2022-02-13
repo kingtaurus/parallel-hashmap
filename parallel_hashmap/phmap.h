@@ -160,7 +160,7 @@ constexpr bool IsNoThrowSwappable() {
 // --------------------------------------------------------------------------
 template <typename T>
 int TrailingZeros(T x) {
-    PHMAP_IF_CONSTEXPR(sizeof(T) == 8)
+    if constexpr (sizeof(T) == 8)
         return base_internal::CountTrailingZerosNonZero64(static_cast<uint64_t>(x));
     else
         return base_internal::CountTrailingZerosNonZero32(static_cast<uint32_t>(x));
@@ -169,7 +169,7 @@ int TrailingZeros(T x) {
 // --------------------------------------------------------------------------
 template <typename T>
 int LeadingZeros(T x) {
-    PHMAP_IF_CONSTEXPR(sizeof(T) == 8)
+    if constexpr (sizeof(T) == 8)
         return base_internal::CountLeadingZeros64(static_cast<uint64_t>(x));
     else
         return base_internal::CountLeadingZeros32(static_cast<uint32_t>(x));
@@ -520,7 +520,7 @@ inline size_t CapacityToGrowth(size_t capacity)
 {
     assert(IsValidCapacity(capacity));
     // `capacity*7/8`
-    PHMAP_IF_CONSTEXPR (Group::kWidth == 8) {
+    if constexpr (Group::kWidth == 8) {
         if (capacity == 7)
         {
             // x-x/8 does not work when x==7.
@@ -537,7 +537,7 @@ inline size_t CapacityToGrowth(size_t capacity)
 inline size_t GrowthToLowerboundCapacity(size_t growth) 
 {
     // `growth*8/7`
-    PHMAP_IF_CONSTEXPR (Group::kWidth == 8) {
+    if constexpr (Group::kWidth == 8) {
         if (growth == 7)
         {
             // x+(x-1)/7 does not work when x==7.

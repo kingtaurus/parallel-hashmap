@@ -1405,7 +1405,7 @@ namespace {
         EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<decltype(set3)>(), 3);
         EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<decltype(set61)>(), 61);
         EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<decltype(set100)>(), 100);
-        PHMAP_IF_CONSTEXPR (sizeof(void *) == 8) {
+        if constexpr (sizeof(void *) == 8) {
             EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<phmap::btree_set<int32_t>>(),
                       BtreeNodePeer::GetNumValuesPerNode<decltype(set61)>());
         }
@@ -1460,7 +1460,7 @@ namespace {
         EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<decltype(set3)>(), 3);
         EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<decltype(set61)>(), 61);
         EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<decltype(set100)>(), 100);
-        PHMAP_IF_CONSTEXPR (sizeof(void *) == 8) {
+        if constexpr (sizeof(void *) == 8) {
             EXPECT_EQ(BtreeNodePeer::GetNumValuesPerNode<phmap::btree_set<int32_t>>(),
                       BtreeNodePeer::GetNumValuesPerNode<decltype(set61)>());
         }
@@ -1551,11 +1551,7 @@ namespace {
         const phmap::btree_map<int, int> &const_map = map;
         EXPECT_EQ(const_map.at(1), 2);
         EXPECT_EQ(const_map.at(2), 8);
-#ifdef PHMAP_HAVE_EXCEPTIONS
         EXPECT_THROW(map.at(3), std::out_of_range);
-#else
-        EXPECT_DEATH(map.at(3), "phmap::btree_map::at");
-#endif
     }
 
     TEST(Btree, BtreeMultisetEmplace) {
