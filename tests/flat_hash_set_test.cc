@@ -38,11 +38,9 @@ using ::testing::UnorderedElementsAre;
 using ::testing::UnorderedElementsAreArray;
 
 template <class T>
-using Set =
-    phmap::THIS_HASH_SET<T, StatefulTestingHash, StatefulTestingEqual, Alloc<T>>;
+using Set = phmap::THIS_HASH_SET<T, StatefulTestingHash, StatefulTestingEqual, Alloc<T>>;
 
-using SetTypes =
-    ::testing::Types<Set<int>, Set<std::string>, Set<Enum>, Set<EnumClass>>;
+using SetTypes = ::testing::Types<Set<int>, Set<std::string>, Set<Enum>, Set<EnumClass>>;
 
 INSTANTIATE_TYPED_TEST_SUITE_P(THIS_TEST_NAME, ConstructorTest, SetTypes);
 INSTANTIATE_TYPED_TEST_SUITE_P(THIS_TEST_NAME, LookupTest, SetTypes);
