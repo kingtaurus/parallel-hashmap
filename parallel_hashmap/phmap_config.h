@@ -79,7 +79,7 @@
 
 // Enforce C++11 as the minimum. 
 #if defined(__cplusplus) && !defined(_MSC_VER)
-    #if __cplusplus < 202004L
+    #if __cplusplus < 201402L
         #error "C++ versions less than C++20 are not supported."
     #endif
 #endif
